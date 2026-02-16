@@ -4,6 +4,7 @@ import (
 	"backend/app/controllers/clientcontrollers"
 	"backend/app/models"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,16 +23,36 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 		resourceAttrs := rs.GetResource().GetAttributes()
 		serverName := getStringAttribute(resourceAttrs, "service.name")
 		appVersion := getStringAttribute(resourceAttrs, "service.version")
+		if appVersion == "" {
+			if scriptVersionId := getStringAttribute(resourceAttrs, "cloudflare.script_version.id"); scriptVersionId != "" {
+				if idx := strings.LastIndex(scriptVersionId, "-"); idx != -1 {
+					appVersion = scriptVersionId[idx+1:]
+				}
+			}
+		}
 
 		for _, ss := range rs.ScopeSpans {
 			for _, span := range ss.Spans {
+				spanAttrs := span.Attributes
+				allAttrs := extractAttributes(spanAttrs)
+
 				traceId := otelTraceIDToUUID(span.TraceId)
+				if traceId == uuid.Nil {
+					rayId := getStringAttribute(spanAttrs, "cloudflare.ray_id")
+					if rayId == "" {
+						rayId = getStringAttribute(resourceAttrs, "cloudflare.ray_id")
+					}
+					if rayId != "" {
+						traceId = rayIDToUUID(rayId)
+					} else {
+						traceId = uuid.New()
+					}
+				}
+
 				spanId := otelSpanIDToUUID(span.SpanId)
 				startTime := nanoToTime(span.StartTimeUnixNano)
 				endTime := nanoToTime(span.EndTimeUnixNano)
 				duration := endTime.Sub(startTime)
-				spanAttrs := span.Attributes
-				allAttrs := extractAttributes(spanAttrs)
 				isRoot := len(span.ParentSpanId) == 0
 
 				if isRoot {

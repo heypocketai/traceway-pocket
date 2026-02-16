@@ -1,6 +1,7 @@
 package otelcontrollers
 
 import (
+	"encoding/hex"
 	"strconv"
 	"time"
 
@@ -15,6 +16,16 @@ func otelTraceIDToUUID(traceID []byte) uuid.UUID {
 	}
 	var u uuid.UUID
 	copy(u[:], traceID)
+	return u
+}
+
+func rayIDToUUID(rayID string) uuid.UUID {
+	b, err := hex.DecodeString(rayID)
+	if err != nil || len(b) == 0 {
+		return uuid.New()
+	}
+	var u uuid.UUID
+	copy(u[16-len(b):], b)
 	return u
 }
 
