@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
@@ -31,6 +31,7 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 			}
 		}
 
+		spanToTraceId := map[string]uuid.UUID{}
 		for _, ss := range rs.ScopeSpans {
 			for _, span := range ss.Spans {
 				spanAttrs := span.Attributes
@@ -41,21 +42,32 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 					rayId = getStringAttribute(resourceAttrs, "cloudflare.ray_id")
 				}
 
+				isRoot := len(span.ParentSpanId) == 0
+
+				spanIdStr := string(span.SpanId)
 				var traceId uuid.UUID
 				if rayId != "" {
 					traceId = rayIDToUUID(rayId)
 				} else {
 					traceId = otelTraceIDToUUID(span.TraceId)
+
+					if !isRoot {
+						if foundTraceId, ok := spanToTraceId[spanIdStr]; ok {
+							traceId = foundTraceId
+						}
+					}
+
 					if traceId == uuid.Nil {
 						traceId = uuid.New()
 					}
 				}
 
+				spanToTraceId[spanIdStr] = traceId
+
 				spanId := otelSpanIDToUUID(span.SpanId)
 				startTime := nanoToTime(span.StartTimeUnixNano)
 				endTime := nanoToTime(span.EndTimeUnixNano)
 				duration := endTime.Sub(startTime)
-				isRoot := len(span.ParentSpanId) == 0
 
 				if isRoot {
 					if span.Kind == tracepb.Span_SPAN_KIND_SERVER && hasHTTPAttributes(spanAttrs) {
