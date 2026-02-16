@@ -2,6 +2,19 @@ name = "tracewayapp"
 main = "./functions/worker.ts"
 compatibility_date = "2025-02-01"
 
+routes = [
+  { pattern = "tracewayapp.com", zone_name = "tracewayapp.com", custom_domain = true }
+]
+
+[vars]
+SENDGRID_FROM_EMAIL = "dusan@tracewayapp.com"
+SENDGRID_TO_EMAIL = "dusan@tracewayapp.com"
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+destinations = ["traceway"]
+
 [assets]
 directory = "./out"
 html_handling = "auto-trailing-slash"
