@@ -1,0 +1,174 @@
+# Haloy
+
+Deploy Traceway to your own server using [Haloy](https://haloy.dev), a CLI-based deployment tool. Haloy manages your containers, handles automatic SSL certificates, and is configured with a single YAML file.
+
+## Prerequisites
+
+Install the Haloy CLI and configure a server by following the instructions at [haloy.dev/docs](https://haloy.dev/docs).
+
+## Configuration
+
+Create a `haloy.yaml` in the traceway project root. Replace `haloy.tracewayapp.com` with your configured Haloy server and `traceway.yourdomain.com` with the domain you want Traceway accessible at.
+
+```yaml
+# haloy api endpoint
+server: haloy.tracewayapp.com
+
+targets:
+  clickhouse:
+    preset: database
+    image:
+      repository: clickhouse/clickhouse-server:24.8-alpine
+    port: 9000
+    env:
+      - name: CLICKHOUSE_DB
+        value: traceway
+      - name: CLICKHOUSE_PASSWORD
+        from:
+          env: CLICKHOUSE_PASSWORD
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+
+  postgres:
+    preset: database
+    image:
+      repository: postgres:17
+    port: 5432
+    env:
+      - name: POSTGRES_USER
+        value: traceway
+      - name: POSTGRES_PASSWORD
+        from:
+          env: POSTGRES_PASSWORD # from .env
+      - name: POSTGRES_DB
+        value: traceway
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  traceway:
+    preset: service
+    image:
+      repository: traceway/traceway:minimal
+      build_config:
+        dockerfile: ./Dockerfile.minimal
+    domains:
+      - domain: traceway.yourdomain.com # will automatically set up TLS
+    port: 80
+    env:
+      - name: APP_BASE_URL
+        value: https://traceway.yourdomain.com # match domain
+      - name: CLICKHOUSE_SERVER
+        value: "clickhouse:9000"
+      - name: CLICKHOUSE_DATABASE
+        value: traceway
+      - name: CLICKHOUSE_USERNAME
+        value: default
+      - name: CLICKHOUSE_PASSWORD
+        from:
+          env: CLICKHOUSE_PASSWORD
+      - name: CLICKHOUSE_TLS
+        value: "false"
+      - name: POSTGRES_HOST
+        value: postgres
+      - name: POSTGRES_PORT
+        value: "5432"
+      - name: POSTGRES_DATABASE
+        value: traceway
+      - name: POSTGRES_USERNAME
+        value: traceway
+      - name: POSTGRES_PASSWORD
+        from:
+          env: POSTGRES_PASSWORD
+      - name: POSTGRES_SSLMODE
+        value: disable
+      - name: JWT_SECRET
+        from:
+          env: JWT_SECRET
+```
+
+Sensitive values use `from: env:` to read from environment variables on your machine at deploy time rather than being stored in the YAML file. Set them before deploying:
+
+```bash
+export CLICKHOUSE_PASSWORD=your-clickhouse-password
+export POSTGRES_PASSWORD=your-postgres-password
+export JWT_SECRET=your-jwt-secret-at-least-32-chars
+```
+
+## Deployment
+
+Deploy the database services first, then the Traceway application.
+
+**1. Deploy databases:**
+
+```bash
+haloy deploy -t clickhouse,postgres
+```
+
+Wait for the databases to be ready before proceeding.
+
+**2. Deploy Traceway:**
+
+```bash
+haloy deploy -t traceway
+```
+
+After deploying, open `https://traceway.yourdomain.com/register` to create your first account.
+
+## Connecting Your SDK
+
+Point your SDK's connection string at your Traceway domain:
+
+```
+<project_token>@https://traceway.yourdomain.com/api/report
+```
+
+## Environment Variables
+
+### ClickHouse target
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLICKHOUSE_DB` | `traceway` | Database to create on startup |
+| `CLICKHOUSE_PASSWORD` | *(from env)* | ClickHouse password |
+
+### PostgreSQL target
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `POSTGRES_USER` | `traceway` | PostgreSQL username |
+| `POSTGRES_PASSWORD` | *(from env)* | PostgreSQL password |
+| `POSTGRES_DB` | `traceway` | PostgreSQL database name |
+
+### Traceway target
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `APP_BASE_URL` | `https://traceway.yourdomain.com` | Public URL of the Traceway instance |
+| `CLICKHOUSE_SERVER` | `clickhouse:9000` | ClickHouse host:port |
+| `CLICKHOUSE_DATABASE` | `traceway` | ClickHouse database name |
+| `CLICKHOUSE_USERNAME` | `default` | ClickHouse username |
+| `CLICKHOUSE_PASSWORD` | *(from env)* | ClickHouse password |
+| `CLICKHOUSE_TLS` | `false` | Enable TLS for ClickHouse |
+| `POSTGRES_HOST` | `postgres` | PostgreSQL host |
+| `POSTGRES_PORT` | `5432` | PostgreSQL port |
+| `POSTGRES_DATABASE` | `traceway` | PostgreSQL database name |
+| `POSTGRES_USERNAME` | `traceway` | PostgreSQL username |
+| `POSTGRES_PASSWORD` | *(from env)* | PostgreSQL password |
+| `POSTGRES_SSLMODE` | `disable` | PostgreSQL SSL mode |
+| `JWT_SECRET` | *(from env)* | JWT signing secret (min 32 chars) |
+
+## Useful Commands
+
+```bash
+# Deploy a specific target
+haloy deploy -t traceway
+
+# Check status of a specific target
+haloy status -t traceway
+
+# Check status of all targets
+haloy status -a
+
+# Validate your config
+haloy validate-config
+```
