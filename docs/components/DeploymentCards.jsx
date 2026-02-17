@@ -30,6 +30,13 @@ const DEPLOYMENTS = [
     description:
       "Development setup with Go and Node.js. Requires local ClickHouse and PostgreSQL.",
   },
+  {
+    title: "Haloy",
+    href: "/server/haloy",
+    subtitle: "ClickHouse + PostgreSQL + Backend + Frontend",
+    description:
+      "Deploy to your own server with automatic SSL and a single YAML config using the Haloy CLI.",
+  }
 ];
 
 export function DeploymentCards() {
