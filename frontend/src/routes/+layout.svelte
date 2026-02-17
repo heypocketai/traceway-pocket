@@ -18,6 +18,7 @@
 	import { page } from '$app/state';
 	import { setupTraceway } from '@tracewayapp/svelte';
 	import { captureException } from '@tracewayapp/frontend';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	if (__TRACEWAY_URL__) {
 		setupTraceway({
@@ -87,6 +88,7 @@
 
 <svelte:head><link rel="icon" href="/favicon.ico" /></svelte:head>
 
+<Tooltip.Provider delayDuration={0}>
 <!-- This is not ideal, but because our layout is a top level route it can end up showing sidebar on the login page (after the login before the transition). -->
 <!-- We could consider moving this to a lower level layout for the actual app, for now it's just a path check -->
 {#if authState.isAuthenticated && page.url.pathname !== '/login' && page.url.pathname !== '/register' && !page.url.pathname.startsWith('/accept-invitation')}
@@ -175,3 +177,4 @@
 		</main>
 	{/if}
 {/if}
+</Tooltip.Provider>
