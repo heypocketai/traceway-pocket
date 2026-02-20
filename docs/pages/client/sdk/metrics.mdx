@@ -48,7 +48,43 @@ traceway.CaptureMetric("active.users", float64(activeUsers))
 traceway.CaptureMetric("orders.per_minute", orderRate)
 ```
 
-Custom metrics are not currently displayed on the dashboard.
+## CaptureMetricWithTags
+
+Attach key-value tags to a metric point for filtering and grouping in the dashboard:
+
+```go
+traceway.CaptureMetricWithTags("queue.depth", float64(len(queue)), map[string]string{
+    "queue_name": "emails",
+    "priority":   "high",
+})
+
+traceway.CaptureMetricWithTags("http.external_ms", latency, map[string]string{
+    "service": "stripe",
+    "region":  "us-east-1",
+})
+
+traceway.CaptureMetricWithTags("cache.hit_rate", hitRate, map[string]string{
+    "cache": "redis",
+})
+```
+
+## Tags
+
+Tags are key-value pairs attached to individual metric points. In the dashboard, you can:
+
+- **Filter** to specific tag values (e.g. show only `queue_name = emails`)
+- **Group by** a tag to split metrics into separate series (e.g. one line per `server_name`)
+
+Common tags:
+
+| Tag            | Example                  |
+| -------------- | ------------------------ |
+| `server_name`  | `"web-1"`, `"web-2"`    |
+| `region`       | `"us-east-1"`           |
+| `queue_name`   | `"emails"`, `"payments"`|
+| `environment`  | `"production"`          |
+
+If you don't need tags, use `CaptureMetric` — it records the same data without any tag metadata.
 
 ## What to Look For
 

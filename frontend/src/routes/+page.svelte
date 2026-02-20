@@ -27,7 +27,8 @@
 		type ProjectWithToken,
 		isFrontendFramework,
 		isJsFramework,
-		isCloudflareFramework
+		isCloudflareFramework,
+		isOtelFramework
 	} from '$lib/state/projects.svelte';
 	import { setSortState } from '$lib/utils/sort-storage';
 	import { Button } from '$lib/components/ui/button';
@@ -36,6 +37,7 @@
 	import javascript from 'svelte-highlight/languages/javascript';
 	import bash from 'svelte-highlight/languages/bash';
 	import { themeState } from '$lib/state/theme.svelte';
+	import yaml from 'svelte-highlight/languages/yaml';
 	import 'svelte-highlight/styles/github-dark.css';
 	import {
 		getFrameworkCode,
@@ -127,8 +129,12 @@
 	const testingRouteCode = $derived(getTestingRouteCode(projectWithToken?.framework));
 	const testingRouteCode2 = $derived(getTestingRouteCode2(projectWithToken?.framework));
 
-	const isCloudflare = $derived(projectWithToken ? isCloudflareFramework(projectWithToken.framework) : false);
-	const cfOtelEndpoint = $derived(projectWithToken ? `${projectWithToken.backendUrl}/api/otel/v1/traces` : '');
+	const isCloudflare = $derived(
+		projectWithToken ? isCloudflareFramework(projectWithToken.framework) : false
+	);
+	const cfOtelEndpoint = $derived(
+		projectWithToken ? `${projectWithToken.backendUrl}/api/otel/v1/traces` : ''
+	);
 	const cfAuthHeader = $derived(projectWithToken ? `Bearer ${projectWithToken.token}` : '');
 	const cfWranglerConfig = $derived(`{
   "observability": {
@@ -149,6 +155,44 @@
 	let copiedCfAuth = $state(false);
 	let copiedCfWrangler = $state(false);
 	let copiedCfDeploy = $state(false);
+
+	const isOtel = $derived(projectWithToken ? isOtelFramework(projectWithToken.framework) : false);
+	const otelBaseEndpoint = $derived(
+		projectWithToken ? `${projectWithToken.backendUrl}/api/otel` : ''
+	);
+	const otelAuthHeader = $derived(projectWithToken ? `Bearer ${projectWithToken.token}` : '');
+	const otelCollectorConfig = $derived(
+		projectWithToken
+			? `exporters:
+  otlphttp:
+    endpoint: "${projectWithToken.backendUrl}/api/otel"
+    headers:
+      Authorization: "Bearer ${projectWithToken.token}"
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlphttp]
+    metrics:
+      exporters: [otlphttp]`
+			: ''
+	);
+
+	const otelSdks = [
+		{
+			lang: 'Node.js',
+			cmd: 'npm install @opentelemetry/sdk-node @opentelemetry/exporter-trace-otlp-http @opentelemetry/exporter-metrics-otlp-http'
+		},
+		{ lang: 'Python', cmd: 'pip install opentelemetry-sdk opentelemetry-exporter-otlp-proto-http' },
+		{ lang: 'Go', cmd: 'go get go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp' },
+		{ lang: 'Java', cmd: "implementation 'io.opentelemetry:opentelemetry-exporter-otlp'" },
+		{ lang: '.NET', cmd: 'dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol' }
+	];
+
+	let copiedSdkLang = $state<string | null>(null);
+	let copiedOtelEndpoint = $state(false);
+	let copiedOtelAuth = $state(false);
+	let copiedOtelCollector = $state(false);
 
 	async function copyCfEndpoint() {
 		await navigator.clipboard.writeText(cfOtelEndpoint);
@@ -172,6 +216,30 @@
 		await navigator.clipboard.writeText('npx wrangler deploy');
 		copiedCfDeploy = true;
 		setTimeout(() => (copiedCfDeploy = false), 2000);
+	}
+
+	async function copySdkInstall(lang: string, cmd: string) {
+		await navigator.clipboard.writeText(cmd);
+		copiedSdkLang = lang;
+		setTimeout(() => (copiedSdkLang = null), 2000);
+	}
+
+	async function copyOtelEndpoint() {
+		await navigator.clipboard.writeText(otelBaseEndpoint);
+		copiedOtelEndpoint = true;
+		setTimeout(() => (copiedOtelEndpoint = false), 2000);
+	}
+
+	async function copyOtelAuth() {
+		await navigator.clipboard.writeText(otelAuthHeader);
+		copiedOtelAuth = true;
+		setTimeout(() => (copiedOtelAuth = false), 2000);
+	}
+
+	async function copyOtelCollector() {
+		await navigator.clipboard.writeText(otelCollectorConfig);
+		copiedOtelCollector = true;
+		setTimeout(() => (copiedOtelCollector = false), 2000);
 	}
 
 	async function copyInstall() {
@@ -306,14 +374,17 @@
 								<h3 class="font-semibold">Create a Destination</h3>
 							</div>
 							<p class="mt-1 ml-9 text-sm text-muted-foreground">
-								In the Cloudflare dashboard, create an OTLP destination with the endpoint and authorization header below.
+								In the Cloudflare dashboard, create an OTLP destination with the endpoint and
+								authorization header below.
 							</p>
 						</div>
-						<div class="p-4 space-y-4">
+						<div class="space-y-4 p-4">
 							<div>
-								<p class="text-sm font-medium mb-2">OTLP Traces Endpoint</p>
+								<p class="mb-2 text-sm font-medium">OTLP Traces Endpoint</p>
 								<div class="flex items-center gap-2">
-									<code class="flex-1 rounded-md bg-muted px-3 py-2 text-sm font-mono break-all">{cfOtelEndpoint}</code>
+									<code class="flex-1 rounded-md bg-muted px-3 py-2 font-mono text-sm break-all"
+										>{cfOtelEndpoint}</code
+									>
 									<Button variant="outline" size="sm" onclick={copyCfEndpoint}>
 										{#if copiedCfEndpoint}
 											<Check class="h-4 w-4 text-green-500" />
@@ -324,9 +395,11 @@
 								</div>
 							</div>
 							<div>
-								<p class="text-sm font-medium mb-2">Authorization Header</p>
+								<p class="mb-2 text-sm font-medium">Authorization Header</p>
 								<div class="flex items-center gap-2">
-									<code class="flex-1 rounded-md bg-muted px-3 py-2 text-sm font-mono break-all">{cfAuthHeader}</code>
+									<code class="flex-1 rounded-md bg-muted px-3 py-2 font-mono text-sm break-all"
+										>{cfAuthHeader}</code
+									>
 									<Button variant="outline" size="sm" onclick={copyCfAuth}>
 										{#if copiedCfAuth}
 											<Check class="h-4 w-4 text-green-500" />
@@ -395,7 +468,9 @@
 						</div>
 						<div class="p-4">
 							<div class="flex items-center gap-2">
-								<code class="flex-1 rounded-md bg-muted px-3 py-2 text-sm font-mono break-all">npx wrangler deploy</code>
+								<code class="flex-1 rounded-md bg-muted px-3 py-2 font-mono text-sm break-all"
+									>npx wrangler deploy</code
+								>
 								<Button variant="outline" size="sm" onclick={copyCfDeploy}>
 									{#if copiedCfDeploy}
 										<Check class="h-4 w-4 text-green-500" />
@@ -406,148 +481,291 @@
 							</div>
 						</div>
 					</div>
+				{:else if isOtel}
+					<!-- OTel Step 1: Install an OTel SDK -->
+					<div class="rounded-md border bg-card">
+						<div class="border-b px-4 py-3">
+							<div class="flex items-center gap-3">
+								<div
+									class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
+								>
+									1
+								</div>
+								<h3 class="font-semibold">Install an OpenTelemetry SDK</h3>
+							</div>
+							<p class="mt-1 ml-9 text-sm text-muted-foreground">
+								Choose the OTel SDK for your language. Any language that supports OTLP/HTTP export
+								will work.
+							</p>
+						</div>
+						<div class="space-y-2 p-4">
+							{#each otelSdks as sdk}
+								<div class="flex items-center gap-2">
+									<span class="w-16 shrink-0 text-sm font-medium">{sdk.lang}</span>
+									<code class="flex-1 rounded-md bg-muted px-3 py-2 font-mono text-xs break-all"
+										>{sdk.cmd}</code
+									>
+									<Button
+										variant="outline"
+										size="sm"
+										onclick={() => copySdkInstall(sdk.lang, sdk.cmd)}
+									>
+										{#if copiedSdkLang === sdk.lang}
+											<Check class="h-4 w-4 text-green-500" />
+										{:else}
+											<Copy class="h-4 w-4" />
+										{/if}
+									</Button>
+								</div>
+							{/each}
+							<p class="ml-16 pt-1 text-xs text-muted-foreground">
+								<a
+									href="https://opentelemetry.io/docs/languages/"
+									target="_blank"
+									rel="noopener noreferrer"
+									class="underline hover:text-foreground">View all supported languages</a
+								>
+							</p>
+						</div>
+					</div>
+
+					<!-- OTel Step 2: Configure the Exporter -->
+					<div class="rounded-md border bg-card">
+						<div class="border-b px-4 py-3">
+							<div class="flex items-center gap-3">
+								<div
+									class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
+								>
+									2
+								</div>
+								<h3 class="font-semibold">Configure the OTLP Exporter</h3>
+							</div>
+							<p class="mt-1 ml-9 text-sm text-muted-foreground">
+								Point your OTLP/HTTP exporter at Traceway using the endpoint and token below.
+							</p>
+						</div>
+						<div class="space-y-4 p-4">
+							<div>
+								<p class="mb-2 text-sm font-medium">OTLP Endpoint</p>
+								<p class="mb-2 text-xs text-muted-foreground">
+									Your SDK or Collector will append <code
+										class="rounded bg-muted px-1 py-0.5 font-mono text-xs">/v1/traces</code
+									>
+									and
+									<code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">/v1/metrics</code> automatically.
+								</p>
+								<div class="flex items-center gap-2">
+									<code class="flex-1 rounded-md bg-muted px-3 py-2 font-mono text-sm break-all"
+										>{otelBaseEndpoint}</code
+									>
+									<Button variant="outline" size="sm" onclick={copyOtelEndpoint}>
+										{#if copiedOtelEndpoint}
+											<Check class="h-4 w-4 text-green-500" />
+										{:else}
+											<Copy class="h-4 w-4" />
+										{/if}
+									</Button>
+								</div>
+							</div>
+							<div>
+								<p class="mb-2 text-sm font-medium">Authorization Header</p>
+								<div class="flex items-center gap-2">
+									<code class="flex-1 rounded-md bg-muted px-3 py-2 font-mono text-sm break-all"
+										>{otelAuthHeader}</code
+									>
+									<Button variant="outline" size="sm" onclick={copyOtelAuth}>
+										{#if copiedOtelAuth}
+											<Check class="h-4 w-4 text-green-500" />
+										{:else}
+											<Copy class="h-4 w-4" />
+										{/if}
+									</Button>
+								</div>
+							</div>
+							<div>
+								<p class="mb-2 text-sm font-medium">Example: OTel Collector (optional)</p>
+								<div class="relative">
+									<div class="absolute top-2 right-2 z-10">
+										<Button variant="outline" size="sm" onclick={copyOtelCollector}>
+											{#if copiedOtelCollector}
+												<Check class="mr-2 h-4 w-4 text-green-500" />
+												Copied!
+											{:else}
+												<Copy class="mr-2 h-4 w-4" />
+												Copy
+											{/if}
+										</Button>
+									</div>
+									<div
+										class="overflow-x-auto rounded-lg text-sm {themeState.isDark
+											? 'dark-code'
+											: 'light-code'}"
+									>
+										<Highlight language={yaml} code={otelCollectorConfig} />
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- OTel Step 3: Run Your Application -->
+					<div class="rounded-md border bg-card">
+						<div class="border-b px-4 py-3">
+							<div class="flex items-center gap-3">
+								<div
+									class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
+								>
+									3
+								</div>
+								<h3 class="font-semibold">Run Your Application</h3>
+							</div>
+							<p class="mt-1 ml-9 text-sm text-muted-foreground">
+								Start your application with OpenTelemetry instrumentation enabled. The SDK will
+								automatically export traces and metrics to Traceway via OTLP/HTTP.
+							</p>
+						</div>
+					</div>
 				{:else}
-				<!-- Step 1: Install -->
-				<div class="rounded-md border bg-card">
-					<div class="border-b px-4 py-3">
-						<div class="flex items-center gap-3">
-							<div
-								class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
-							>
-								1
-							</div>
-							<h3 class="font-semibold">Install the SDK</h3>
-						</div>
-					</div>
-					<div class="p-4">
-						<div class="relative">
-							<div class="absolute top-2 right-2 z-10">
-								<Button variant="outline" size="sm" onclick={copyInstall}>
-									{#if copiedInstall}
-										<Check class="mr-2 h-4 w-4 text-green-500" />
-										Copied!
-									{:else}
-										<Copy class="mr-2 h-4 w-4" />
-										Copy
-									{/if}
-								</Button>
-							</div>
-							<div
-								class="overflow-x-auto rounded-lg text-sm {themeState.isDark
-									? 'dark-code'
-									: 'light-code'}"
-							>
-								<Highlight language={bash} code={installCommand} />
+					<!-- Step 1: Install -->
+					<div class="rounded-md border bg-card">
+						<div class="border-b px-4 py-3">
+							<div class="flex items-center gap-3">
+								<div
+									class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
+								>
+									1
+								</div>
+								<h3 class="font-semibold">Install the SDK</h3>
 							</div>
 						</div>
+						<div class="p-4">
+							<div class="relative">
+								<div class="absolute top-2 right-2 z-10">
+									<Button variant="outline" size="sm" onclick={copyInstall}>
+										{#if copiedInstall}
+											<Check class="mr-2 h-4 w-4 text-green-500" />
+											Copied!
+										{:else}
+											<Copy class="mr-2 h-4 w-4" />
+											Copy
+										{/if}
+									</Button>
+								</div>
+								<div
+									class="overflow-x-auto rounded-lg text-sm {themeState.isDark
+										? 'dark-code'
+										: 'light-code'}"
+								>
+									<Highlight language={bash} code={installCommand} />
+								</div>
+							</div>
+						</div>
 					</div>
-				</div>
 
-				<!-- Step 2: Setup Integration -->
-				<div class="rounded-md border bg-card">
-					<div class="border-b px-4 py-3">
-						<div class="flex items-center gap-3">
-							<div
-								class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
-							>
-								2
+					<!-- Step 2: Setup Integration -->
+					<div class="rounded-md border bg-card">
+						<div class="border-b px-4 py-3">
+							<div class="flex items-center gap-3">
+								<div
+									class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
+								>
+									2
+								</div>
+								<h3 class="font-semibold">
+									{getFrameworkLabel(projectWithToken.framework)} Integration
+								</h3>
 							</div>
-							<h3 class="font-semibold">
-								{getFrameworkLabel(projectWithToken.framework)} Integration
-							</h3>
+							<p class="mt-1 ml-9 text-sm text-muted-foreground">
+								Add the Traceway middleware to your application.
+							</p>
 						</div>
-						<p class="mt-1 ml-9 text-sm text-muted-foreground">
-							Add the Traceway middleware to your application.
-						</p>
-					</div>
-					<div class="p-4">
-						<div class="relative">
-							<div class="absolute top-2 right-2 z-10">
-								<Button variant="outline" size="sm" onclick={copyCode}>
-									{#if copiedCode}
-										<Check class="mr-2 h-4 w-4 text-green-500" />
-										Copied!
-									{:else}
-										<Copy class="mr-2 h-4 w-4" />
-										Copy
-									{/if}
-								</Button>
-							</div>
-							<div
-								class="overflow-x-auto rounded-lg text-sm {themeState.isDark
-									? 'dark-code'
-									: 'light-code'}"
-							>
-								<Highlight language={highlightLanguage} code={sdkCode} />
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<!-- Step 3: Add Testing Route -->
-				<div class="rounded-md border bg-card">
-					<div class="border-b px-4 py-3">
-						<div class="flex items-center gap-3">
-							<div
-								class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
-							>
-								3
-							</div>
-							<h3 class="font-semibold">Add a Test Route</h3>
-						</div>
-						<p class="mt-1 ml-9 text-sm text-muted-foreground">
-							Add this route to verify your integration, then visit <code
-								class="rounded bg-muted px-1 py-0.5 font-mono text-xs">GET /testing</code
-							> in your browser.
-						</p>
-					</div>
-					<div class="p-4">
-						<div class="relative">
-							<div class="absolute top-2 right-2 z-10">
-								<Button variant="outline" size="sm" onclick={copyTesting}>
-									{#if copiedTesting}
-										<Check class="mr-2 h-4 w-4 text-green-500" />
-										Copied!
-									{:else}
-										<Copy class="mr-2 h-4 w-4" />
-										Copy
-									{/if}
-								</Button>
-							</div>
-							<div
-								class="overflow-x-auto rounded-lg text-sm {themeState.isDark
-									? 'dark-code'
-									: 'light-code'}"
-							>
-								<Highlight language={highlightLanguage} code={testingRouteCode} />
-							</div>
-						</div>
-
-						<div class="flex justify-center p-2 italic">or</div>
-
-						<div class="relative">
-							<div class="absolute top-2 right-2 z-10">
-								<Button variant="outline" size="sm" onclick={copyTesting2}>
-									{#if copiedTesting2}
-										<Check class="mr-2 h-4 w-4 text-green-500" />
-										Copied!
-									{:else}
-										<Copy class="mr-2 h-4 w-4" />
-										Copy
-									{/if}
-								</Button>
-							</div>
-							<div
-								class="overflow-x-auto rounded-lg text-sm {themeState.isDark
-									? 'dark-code'
-									: 'light-code'}"
-							>
-								<Highlight language={highlightLanguage} code={testingRouteCode2} />
+						<div class="p-4">
+							<div class="relative">
+								<div class="absolute top-2 right-2 z-10">
+									<Button variant="outline" size="sm" onclick={copyCode}>
+										{#if copiedCode}
+											<Check class="mr-2 h-4 w-4 text-green-500" />
+											Copied!
+										{:else}
+											<Copy class="mr-2 h-4 w-4" />
+											Copy
+										{/if}
+									</Button>
+								</div>
+								<div
+									class="overflow-x-auto rounded-lg text-sm {themeState.isDark
+										? 'dark-code'
+										: 'light-code'}"
+								>
+									<Highlight language={highlightLanguage} code={sdkCode} />
+								</div>
 							</div>
 						</div>
 					</div>
-				</div>
 
+					<!-- Step 3: Add Testing Route -->
+					<div class="rounded-md border bg-card">
+						<div class="border-b px-4 py-3">
+							<div class="flex items-center gap-3">
+								<div
+									class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground"
+								>
+									3
+								</div>
+								<h3 class="font-semibold">Add a Test Route</h3>
+							</div>
+							<p class="mt-1 ml-9 text-sm text-muted-foreground">
+								Add this route to verify your integration, then visit <code
+									class="rounded bg-muted px-1 py-0.5 font-mono text-xs">GET /testing</code
+								> in your browser.
+							</p>
+						</div>
+						<div class="p-4">
+							<div class="relative">
+								<div class="absolute top-2 right-2 z-10">
+									<Button variant="outline" size="sm" onclick={copyTesting}>
+										{#if copiedTesting}
+											<Check class="mr-2 h-4 w-4 text-green-500" />
+											Copied!
+										{:else}
+											<Copy class="mr-2 h-4 w-4" />
+											Copy
+										{/if}
+									</Button>
+								</div>
+								<div
+									class="overflow-x-auto rounded-lg text-sm {themeState.isDark
+										? 'dark-code'
+										: 'light-code'}"
+								>
+									<Highlight language={highlightLanguage} code={testingRouteCode} />
+								</div>
+							</div>
+
+							<div class="flex justify-center p-2 italic">or</div>
+
+							<div class="relative">
+								<div class="absolute top-2 right-2 z-10">
+									<Button variant="outline" size="sm" onclick={copyTesting2}>
+										{#if copiedTesting2}
+											<Check class="mr-2 h-4 w-4 text-green-500" />
+											Copied!
+										{:else}
+											<Copy class="mr-2 h-4 w-4" />
+											Copy
+										{/if}
+									</Button>
+								</div>
+								<div
+									class="overflow-x-auto rounded-lg text-sm {themeState.isDark
+										? 'dark-code'
+										: 'light-code'}"
+								>
+									<Highlight language={highlightLanguage} code={testingRouteCode2} />
+								</div>
+							</div>
+						</div>
+					</div>
 				{/if}
 				<!-- Bottom Check Again -->
 				<div class="rounded-md border bg-card">
@@ -558,9 +776,14 @@
 							<Unplug class="h-6 w-6 text-destructive" />
 						</div>
 						<p class="mb-4 text-sm text-muted-foreground">
-							Once you've completed the steps above and triggered the <code
-								class="rounded bg-muted px-1 py-0.5 font-mono text-xs">/testing</code
-							> endpoint, click below to verify.
+							{#if isOtel || isCloudflare}
+								Once you've completed the steps above and sent some traffic through your
+								application, click below to verify.
+							{:else}
+								Once you've completed the steps above and triggered the <code
+									class="rounded bg-muted px-1 py-0.5 font-mono text-xs">/testing</code
+								> endpoint, click below to verify.
+							{/if}
 						</p>
 						<Button variant="outline" onclick={checkAgain} disabled={checking}>
 							{#if checking}

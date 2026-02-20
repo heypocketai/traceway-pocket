@@ -1,55 +1,45 @@
 # OpenTelemetry Integration
 
-Send traces and metrics from any OpenTelemetry-instrumented application to Traceway using the standard OTLP/HTTP protocol.
+Send traces and metrics from any OpenTelemetry-instrumented application to Traceway — no vendor SDK required.
 
-## Supported Protocols
+[OpenTelemetry](https://opentelemetry.io/) (OTel) is the industry-standard, vendor-neutral framework for collecting telemetry. If your app already uses OTel, you can point it at Traceway with a few lines of config. If you're starting fresh, any OTel SDK will work.
 
-| Protocol | Content-Type |
-|----------|-------------|
-| Protobuf | `application/x-protobuf` or `application/protobuf` |
-| JSON | `application/json` |
+## How It Works
 
-Both formats follow the [OTLP/HTTP specification](https://opentelemetry.io/docs/specs/otlp/#otlphttp). Gzip compression is supported via the `Content-Encoding: gzip` header.
+1. **Instrument your app** with an OpenTelemetry SDK (or auto-instrumentation).
+2. **Export via OTLP/HTTP** — configure the SDK (or an OTel Collector) to send data to your Traceway instance.
+3. **Traceway maps the data** — spans become endpoints and traces; metrics appear on your dashboards.
 
-## Endpoints
+## Supported Languages
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/otel/v1/traces` | Ingest spans and trace data |
-| POST | `/api/otel/v1/metrics` | Ingest metric data |
+Any language with an OTel SDK can export to Traceway. Here are the most common ones:
 
-Maximum request body size is 10MB.
+| Language | OTel SDK | Install |
+|----------|----------|---------|
+| Java | [opentelemetry-java](https://github.com/open-telemetry/opentelemetry-java) | [Agent JAR](https://opentelemetry.io/docs/zero-code/java/agent/) |
+| Python | [opentelemetry-python](https://github.com/open-telemetry/opentelemetry-python) | `pip install opentelemetry-sdk` |
+| C# / .NET | [opentelemetry-dotnet](https://github.com/open-telemetry/opentelemetry-dotnet) | `dotnet add package OpenTelemetry` |
+| Go | [opentelemetry-go](https://github.com/open-telemetry/opentelemetry-go) | `go get go.opentelemetry.io/otel` |
+| Node.js | [opentelemetry-js](https://github.com/open-telemetry/opentelemetry-js) | `npm install @opentelemetry/sdk-node` |
+| Cloudflare Workers | [workers-sdk](https://developers.cloudflare.com/workers/observability/otel/) | Built-in — see [Cloudflare guide](/client/otel-cloudflare) |
 
-## Authentication
+## Configuration
 
-All requests must include a Bearer token in the `Authorization` header. Use your project token from the Traceway dashboard.
+| Setting | Value |
+|---------|-------|
+| **Endpoint** | `https://<your-instance>/api/otel` |
+| **Traces path** | `/v1/traces` |
+| **Metrics path** | `/v1/metrics` |
+| **Auth header** | `Authorization: Bearer <project_token>` |
+| **Protocol** | OTLP/HTTP (Protobuf or JSON) |
+| **Compression** | Gzip supported (`Content-Encoding: gzip`) |
+| **Max body size** | 10 MB |
 
-```
-Authorization: Bearer <project_token>
-```
+## Quick Start: Direct SDK Export
 
-## Quick Start with OTel Collector
+The simplest setup — your app exports directly to Traceway with no extra infrastructure.
 
-Configure the OpenTelemetry Collector to export to Traceway:
-
-```yaml
-exporters:
-  otlphttp:
-    endpoint: "https://your-traceway-instance.com/api/otel"
-    headers:
-      Authorization: "Bearer your-project-token"
-
-service:
-  pipelines:
-    traces:
-      exporters: [otlphttp]
-    metrics:
-      exporters: [otlphttp]
-```
-
-## Quick Start with OTel SDK
-
-Configure an OpenTelemetry SDK to export directly to Traceway. Here's an example using the Node.js SDK:
+Here's a Node.js example:
 
 ```typescript
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -69,6 +59,33 @@ const metricExporter = new OTLPMetricExporter({
   },
 });
 ```
+
+The same pattern applies to any language — set the OTLP/HTTP endpoint and the `Authorization` header in your exporter config.
+
+## Quick Start: OTel Collector
+
+If you already run an [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) or want a central pipeline that fans out to multiple backends, you can route data through it. **This is optional** — the direct SDK export above works without a Collector.
+
+```yaml
+exporters:
+  otlphttp:
+    endpoint: "https://your-traceway-instance.com/api/otel"
+    headers:
+      Authorization: "Bearer your-project-token"
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlphttp]
+    metrics:
+      exporters: [otlphttp]
+```
+
+## Connection Page
+
+Your Traceway dashboard includes a **Connection** page with a ready-made config snippet and your project token. Go to **Connection** in the sidebar to grab it.
+
+![Connection page](/connection-otel.png)
 
 ## Next Steps
 

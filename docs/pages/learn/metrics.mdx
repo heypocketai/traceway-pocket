@@ -1,0 +1,100 @@
+# Metrics
+
+Metrics are time-series measurements that track your application's health and behavior over time. The Traceway SDKs automatically collect system metrics (CPU, memory, goroutines), and you can capture custom metrics for anything specific to your application. For OpenTelemetry, the automatic metrics depend on which SDK and instrumentation libraries you use.
+
+## Metric Structure
+
+Each metric point contains:
+
+| Field     | Description                                       |
+| --------- | ------------------------------------------------- |
+| Name      | Dot-separated identifier (e.g. `cpu.used_pcnt`)   |
+| Value     | Numeric measurement (`float64`)                   |
+| Tags      | Key-value metadata (e.g. `server_name: "web-1"`)  |
+| Timestamp | When the measurement was taken                     |
+
+## Automatic vs Custom Metrics
+
+**Automatic metrics** are collected without any code changes. The Traceway Go and Node.js SDKs capture CPU usage, memory consumption, goroutine count (Go), and GC statistics at a regular interval (default: 30 seconds). For OpenTelemetry, the available automatic metrics depend on your SDK and instrumentation libraries — for example, the Go OTel runtime instrumentation provides goroutine and memory metrics, while the Node.js OTel runtime instrumentation provides event loop and heap metrics.
+
+**Custom metrics** are captured in your application code using `CaptureMetric` or `CaptureMetricWithTags`. Use these for business metrics (orders per minute), resource metrics (queue depth), or performance metrics (external API latency).
+
+See the SDK-specific pages for API details: [Go SDK](/client/sdk/metrics) | [Node.js SDK](/client/node-sdk/metrics)
+
+## Tags
+
+Tags are key-value pairs attached to individual metric points. They enable filtering and grouping in the dashboard.
+
+Common tags include:
+
+| Tag            | Example Values          | Use Case                        |
+| -------------- | ----------------------- | ------------------------------- |
+| `server_name`  | `web-1`, `web-2`        | Compare metrics across servers  |
+| `region`       | `us-east-1`, `eu-west`  | Regional breakdowns             |
+| `queue_name`   | `emails`, `payments`    | Per-queue monitoring            |
+| `environment`  | `production`, `staging` | Environment comparison          |
+
+Tags are captured via `CaptureMetricWithTags` in the Go SDK, or as resource attributes in OpenTelemetry.
+
+## The Metrics Dashboard
+
+The metrics dashboard organizes your data into **widget groups** and **widgets**.
+
+<img src="/metrics.png" alt="Metrics Dashboard" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+
+### Widget Groups
+
+Widget groups are named tabs that organize related widgets together. When you create a Go or Node.js project, default groups are created automatically with system metric widgets. OpenTelemetry projects start with a blank dashboard — you create groups as needed.
+
+You can create, rename, and delete widget groups from the dashboard.
+
+### Widgets
+
+Widgets are individual chart cards within a group. Each widget displays one or more metric sources as a visualization.
+
+## Widget Types
+
+| Type         | Best For                                           |
+| ------------ | -------------------------------------------------- |
+| Line Chart   | Trends over time (CPU usage, request rate)         |
+| Area Chart   | Volume over time with filled area                  |
+| Bar Chart    | Comparing values across time intervals             |
+| Single Value | Current or aggregated value at a glance            |
+| Table        | Tabular view of metric values                      |
+
+## Widget Configuration
+
+Each widget contains one or more **sources**. Each source specifies:
+
+| Setting      | Description                                                                 |
+| ------------ | --------------------------------------------------------------------------- |
+| Metric Name  | Selected from auto-discovered metrics in your project                       |
+| Aggregation  | How values are combined: `avg`, `min`, `max`, `sum`, or `count`             |
+| Tag Filters  | Narrow to specific tag values (e.g. `server_name = web-1`)                  |
+| Group By     | Split into separate series per tag value (e.g. one line per `server_name`)  |
+
+Multiple sources on the same widget overlay their series on the same chart, useful for comparing related metrics side by side.
+
+<img src="/new-widget-dialog.png" alt="Widget configuration dialog" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+
+## Time Range
+
+The dashboard supports preset time ranges (5m, 15m, 30m, 1h, 3h, 6h, 12h, 24h, 3d, 7d, 1M, 3M) and custom date/time ranges.
+
+The backend automatically selects the optimal storage resolution based on the selected range:
+
+| Range         | Resolution      |
+| ------------- | --------------- |
+| Up to 3 hours | Raw data points |
+| 3h to 24h     | 1-minute aggregates |
+| 24h to 7 days | 1-hour aggregates  |
+| Over 7 days   | 1-day aggregates   |
+
+This keeps queries fast regardless of the time window.
+
+## Creating Your First Dashboard
+
+1. **Create a widget group** — Click the **+** button next to the existing tabs and give it a name
+2. **Add a widget** — Click **Add Widget**, pick a metric from the dropdown, choose an aggregation, and optionally add tag filters or a group-by
+3. **Adjust the time range** — Use the preset buttons or select a custom range to see the data window you need
+4. **Interact** — Hover over data points for exact values, drag-select a region to zoom in, and use the widget menu to move, edit, or delete widgets
