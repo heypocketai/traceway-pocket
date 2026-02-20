@@ -33,14 +33,21 @@ func (c *widgetGroupController) List(ctx *gin.Context) {
 		return
 	}
 	if len(list) == 0 {
-		if err := ensureDefaultWidgetGroups(tx, projectId); err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to create default widget groups: %w", err))
+		project, err := repositories.ProjectRepository.FindById(tx, projectId)
+		if err != nil {
+			ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find project: %w", err))
 			return
 		}
-		list, err = repositories.WidgetGroupRepository.FindByProject(tx, projectId)
-		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list widget groups: %w", err))
-			return
+		if project == nil || project.Framework != "opentelemetry" {
+			if err := ensureDefaultWidgetGroups(tx, projectId); err != nil {
+				ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to create default widget groups: %w", err))
+				return
+			}
+			list, err = repositories.WidgetGroupRepository.FindByProject(tx, projectId)
+			if err != nil {
+				ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list widget groups: %w", err))
+				return
+			}
 		}
 	}
 

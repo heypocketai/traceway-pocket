@@ -415,11 +415,13 @@
 			<LoadingCircle size="xlg" />
 		</div>
 	{:else if widgetGroups.length === 0}
-		<div class="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+		<div
+			class="flex flex-col items-center justify-center rounded-md bg-muted py-20 text-center text-muted-foreground"
+		>
 			<p class="mb-4">No widget groups yet. Create one to get started.</p>
 			<Button onclick={() => (showCreateDialog = true)}>
 				<Plus class="mr-1 h-4 w-4" />
-				Create your first widget group
+				Create your first Widget Group
 			</Button>
 		</div>
 	{:else}
@@ -458,7 +460,7 @@
 											{#snippet child({ props })}
 												<span
 													{...props}
-													class="ml-1 -mr-1 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+													class="-mr-1 ml-1 inline-flex h-5 w-5 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 													role="button"
 													tabindex={0}
 													onclick={(e) => e.stopPropagation()}
@@ -499,10 +501,7 @@
 							<EllipsisVertical class="h-4 w-4" />
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content align="end">
-							<DropdownMenu.Item
-								class="text-destructive"
-								onclick={() => (showDeleteDialog = true)}
-							>
+							<DropdownMenu.Item class="text-destructive" onclick={() => (showDeleteDialog = true)}>
 								<Trash2 class="mr-2 h-4 w-4" />
 								Delete Group
 							</DropdownMenu.Item>
@@ -570,7 +569,7 @@
 			<AlertDialog.Title>New Widget Group</AlertDialog.Title>
 		</AlertDialog.Header>
 		{#if createError}
-			<Alert.Root variant="destructive" class="bg-red-50 border-red-200">
+			<Alert.Root variant="destructive" class="border-red-200 bg-red-50">
 				<CircleAlert class="h-4 w-4 text-red-700" />
 				<Alert.Title class="text-red-800">Error</Alert.Title>
 				<Alert.Description class="text-red-700">{createError}</Alert.Description>
@@ -606,7 +605,7 @@
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		{#if deleteError}
-			<Alert.Root variant="destructive" class="bg-red-50 border-red-200">
+			<Alert.Root variant="destructive" class="border-red-200 bg-red-50">
 				<CircleAlert class="h-4 w-4 text-red-700" />
 				<Alert.Title class="text-red-800">Error</Alert.Title>
 				<Alert.Description class="text-red-700">{deleteError}</Alert.Description>
@@ -637,7 +636,7 @@
 			</AlertDialog.Description>
 		</AlertDialog.Header>
 		{#if deleteWidgetError}
-			<Alert.Root variant="destructive" class="bg-red-50 border-red-200">
+			<Alert.Root variant="destructive" class="border-red-200 bg-red-50">
 				<CircleAlert class="h-4 w-4 text-red-700" />
 				<Alert.Title class="text-red-800">Error</Alert.Title>
 				<Alert.Description class="text-red-700">{deleteWidgetError}</Alert.Description>
