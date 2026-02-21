@@ -40,9 +40,15 @@ Traceway is an error tracking and monitoring platform consisting of:
 - **Purpose**: Lightweight generic CRUD operations for PostgreSQL
 
 #### Model Registration (required before use)
+All models are registered centrally in `models/models.go` via `models.Init()`:
 ```go
-lit.RegisterModel[User](lit.PostgreSQL)
+func Init() {
+    lit.RegisterModel[User](lit.PostgreSQL)
+    lit.RegisterModel[Project](lit.PostgreSQL)
+    // ...all models registered here
+}
 ```
+Repository-local result models (e.g., aggregate structs only used in one repo) can use file-level `init()` instead.
 
 #### Naming Conventions
 - Fields: CamelCase → snake_case (`FirstName` → `first_name`)
@@ -60,7 +66,8 @@ All lit functions take `*sql.Tx` as the first argument for transactional consist
 | `lit.InsertExistingUuid[T](tx, &entity)` | Insert with pre-set UUID |
 | `lit.Select[T](tx, query, args...)` | Retrieve multiple records (returns `[]*T`) |
 | `lit.SelectSingle[T](tx, query, args...)` | Retrieve one record (returns `*T`) |
-| `lit.Update[T](tx, &entity, "WHERE id = $1", id)` | Update (WHERE required) |
+| `lit.Update[T](tx, &entity, "id = $1", id)` | Update (auto-prepends WHERE) |
+| `lit.UpdateNative(tx, "UPDATE table SET col = $1 WHERE ...", args...)` | Raw SQL update for partial/single-field changes |
 | `lit.Delete(tx, "DELETE FROM table WHERE id = $1", id)` | Delete records |
 
 #### Transaction Helper (`pgdb.ExecuteTransaction`)
@@ -77,17 +84,17 @@ project, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error
 })
 ```
 
-#### Transactional Middleware (`pgdb.Transactional`)
-For auth flows and routes requiring transaction context throughout the request lifecycle, use the `Transactional()` middleware:
+#### Transactional Middleware (`middleware.Transactional`)
+For auth flows and routes requiring transaction context throughout the request lifecycle, use the `Transactional` middleware:
 
 ```go
 // In routes.go - wrap routes that need transaction context
-api.POST("/register", pgdb.Transactional(), authController.Register)
-api.POST("/login", pgdb.Transactional(), authController.Login)
+api.POST("/register", middleware.Transactional, authController.Register)
+api.POST("/login", middleware.Transactional, authController.Login)
 
 // In controller - retrieve transaction from Gin context
 func (c *AuthController) Register(ctx *gin.Context) {
-    tx := pgdb.GetTx(ctx)  // Get transaction from context
+    tx := middleware.GetTx(ctx)  // Get transaction from context
 
     // Use tx for all repository calls
     user, err := repositories.UserRepository.FindByEmail(tx, email)
@@ -163,10 +170,8 @@ type CountResult struct {
     Count int `lit:"count"`
 }
 
-// Register the model (in init or startup)
-func init() {
-    lit.RegisterModel[CountResult](lit.PostgreSQL)
-}
+// Register in models.Init() (or file-level init() if repo-local)
+lit.RegisterModel[CountResult](lit.PostgreSQL)
 
 // Use in repository
 func (r *userRepository) CountByOrganization(tx *sql.Tx, orgID uuid.UUID) (int, error) {
@@ -490,21 +495,126 @@ backend/
 │       └── pg/                 # PostgreSQL migrations
 ```
 
+### Middleware Chain Composition
+
+| Route Type | Middleware Chain |
+|-----------|-----------------|
+| Read-only telemetry | `UseAppAuth, RequireProjectAccess` |
+| Write telemetry | `UseAppAuth, RequireProjectAccess, RequireWriteAccess` |
+| PostgreSQL CRUD (read) | `UseAppAuth, RequireProjectAccess, Transactional` |
+| PostgreSQL CRUD (write) | `UseAppAuth, RequireProjectAccess, RequireWriteAccess, Transactional` |
+| Admin org management | `UseAppAuth, RequireAdminAccess, Transactional` |
+| Public (auth/invitations) | `Transactional` only |
+| Client SDK ingestion | `CORSReport, UseClientAuth, UseGzip` |
+
 ### API Endpoints
 
+**Client SDK Ingestion**
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
 | POST | `/api/report` | Client | Telemetry ingestion (gzipped) |
+| POST | `/api/otel/v1/traces` | Client | OTLP/HTTP trace ingestion |
+| POST | `/api/otel/v1/metrics` | Client | OTLP/HTTP metric ingestion |
+
+**Auth & Registration**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
 | POST | `/api/login` | None | Dashboard authentication |
+| POST | `/api/register` | None | New user registration |
+| GET | `/api/has-organizations` | None | Check if any orgs exist (self-hosted only) |
+| POST | `/api/forgot-password` | None | Request password reset email |
+| GET | `/api/password-reset/:token` | None | Validate reset token |
+| POST | `/api/password-reset/:token` | None | Reset password with token |
+
+**Projects**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
 | GET | `/api/projects` | App | List projects |
-| POST | `/api/projects` | App | Create project |
+| POST | `/api/projects` | App+Write | Create project |
+| POST | `/api/projects/source-map-token` | App+Write | Generate source map upload token |
+
+**Dashboard**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
 | GET | `/api/dashboard` | App | Dashboard metrics |
 | GET | `/api/dashboard/overview` | App | Recent issues + top endpoints |
-| POST | `/api/transactions` | App | Transaction search |
-| POST | `/api/transactions/grouped` | App | Endpoint aggregates (P50/P95/P99) |
-| POST | `/api/exception-stack-traces` | App | Exception search |
-| POST | `/api/exception-stack-traces/grouped` | App | Grouped exception list |
-| GET | `/api/exception-stack-traces/:hash` | App | Single exception details |
+| POST | `/api/stats` | App | Homepage stats |
+
+**Metrics**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/api/metrics/application` | App | Application metrics |
+| GET | `/api/metrics/stats` | App | Stats metrics |
+| GET | `/api/metrics/server` | App | Server metrics |
+| POST | `/api/metrics/query` | App | Custom metric queries |
+| GET | `/api/metrics/discover` | App | Discover available metrics |
+| GET | `/api/metrics/discover/tags` | App | Discover metric tags |
+| PUT | `/api/metrics/registry` | App+Write | Update metric registry entry |
+
+**Widget Groups & Widgets**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/api/widget-groups` | App | List widget groups |
+| POST | `/api/widget-groups` | App+Write | Create widget group |
+| GET | `/api/widget-groups/:id` | App | Get group with widgets |
+| PUT | `/api/widget-groups/:id` | App+Write | Update widget group |
+| DELETE | `/api/widget-groups/:id` | App+Write | Delete widget group |
+| POST | `/api/widget-groups/:id/widgets` | App+Write | Add widget |
+| PUT | `/api/widget-groups/:id/widgets/:wid` | App+Write | Update widget |
+| PUT | `/api/widget-groups/:id/widgets/:wid/move` | App+Write | Reorder widget |
+| DELETE | `/api/widget-groups/:id/widgets/:wid` | App+Write | Delete widget |
+
+**Endpoints**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/endpoints` | App | List all endpoints |
+| POST | `/api/endpoints/grouped` | App | Endpoint aggregates (P50/P95/P99) |
+| POST | `/api/endpoints/endpoint` | App | Single endpoint details |
+| POST | `/api/endpoints/chart` | App | Stacked chart data |
+| GET | `/api/endpoints/slow` | App | Get slow endpoint threshold |
+| POST | `/api/endpoints/slow` | App+Write | Set slow endpoint threshold |
+| POST | `/api/endpoints/:endpointId` | App | Endpoint detail view |
+
+**Tasks**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/tasks` | App | List all tasks |
+| POST | `/api/tasks/grouped` | App | Grouped by task name |
+| POST | `/api/tasks/task` | App | Single task details |
+| POST | `/api/tasks/:taskId` | App | Task detail view |
+
+**Exceptions**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/exception-stack-traces` | App | Grouped exception list |
+| POST | `/api/exception-stack-traces/archive` | App+Write | Archive exceptions |
+| POST | `/api/exception-stack-traces/unarchive` | App+Write | Unarchive exceptions |
+| POST | `/api/exception-stack-traces/by-id/:exceptionId` | App | Single exception by ID |
+| POST | `/api/exception-stack-traces/:hash` | App | Exception by hash |
+
+**Organization Management**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| GET | `/api/organizations/:orgId/settings` | Admin | Get org settings |
+| PUT | `/api/organizations/:orgId/settings` | Admin | Update org settings |
+| GET | `/api/organizations/:orgId/members` | Admin | List members |
+| PUT | `/api/organizations/:orgId/members/:userId` | Admin | Update member role |
+| DELETE | `/api/organizations/:orgId/members/:userId` | Admin | Remove member |
+
+**Invitations**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/organizations/:orgId/invitations` | Admin | Send invitation |
+| GET | `/api/organizations/:orgId/invitations` | Admin | List invitations |
+| DELETE | `/api/organizations/:orgId/invitations/:id` | Admin | Revoke invitation |
+| GET | `/api/invitations/:token` | None | Get invitation info |
+| POST | `/api/invitations/:token/accept` | None | Accept (new user) |
+| POST | `/api/invitations/:token/accept-existing` | App | Accept (existing user) |
+
+**Source Maps**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/sourcemaps/upload` | SourceMap | Upload source map file |
 
 ### Data Ingestion Flow (`/api/report`)
 
@@ -544,6 +654,16 @@ func (c *ReportController) Report(ctx *gin.Context) {
 | `organizations` | Multi-tenant organizations |
 | `organization_users` | Junction table linking users to organizations with roles |
 | `projects` | Project config + tokens, linked to organizations |
+| `invitations` | Team invitations with token, role, expiry |
+| `source_maps` | Uploaded source map files (project, version, storage key) |
+| `metric_registry` | Custom metric definitions (type, unit, description) |
+| `widget_groups` | Dashboard widget groups (name, default flag) |
+| `widget_group_widgets` | Individual widgets within groups (type, config, position) |
+
+#### ClickHouse vs PostgreSQL Decision Guide
+- **PostgreSQL**: Relational/config data needing ACID, frequent updates, JOINs, low volume (users, organizations, projects, invitations, widgets, source maps, metric registry)
+- **ClickHouse**: High-volume append-only telemetry with time-series aggregations, batch inserts only (transactions, exceptions, metric points, spans, tasks, sessions)
+- Rule of thumb: "Will this data be updated after creation?" → PostgreSQL. "Is this immutable, time-stamped, high-volume data queried with aggregations?" → ClickHouse.
 
 #### Organization Roles
 | Role | Description |
@@ -701,9 +821,14 @@ if err != nil {
 }
 ```
 
+**Validation error conventions:**
+- `400 Bad Request`: Malformed requests, missing required params, type errors
+- `422 Unprocessable Entity`: Business validation in form dialogs (name too long, duplicate name, required field empty). Return `c.JSON(422, gin.H{"error": "descriptive message"})`. The frontend `api.ts` extracts 422 error messages — dialogs catch and display them inline.
+
 **Summary:**
 - **Stopping errors** (abort the request): `c.AbortWithError(status, traceway.NewStackTraceErrorf("reason: %w", err))`
 - **Non-stopping errors** (continue serving): `traceway.CaptureException(fmt.Errorf("reason: %w", err))`
+- **Validation errors** (user-facing): `c.JSON(422, gin.H{"error": "message"})` for form validation
 - **Always** wrap errors with `traceway.NewStackTraceErrorf` or `fmt.Errorf` using `%w` — never discard the original error
 
 ---
@@ -979,22 +1104,89 @@ The SDK sends data as gzipped JSON:
 
 5. **Add frontend API call** in `frontend/src/lib/api.ts` or directly in page
 
+**POST body convention:** List/search endpoints use POST with a JSON body containing filters and pagination:
+```go
+type ListRequest struct {
+    ProjectId  string           `json:"projectId"`
+    FromDate   string           `json:"fromDate"`
+    ToDate     string           `json:"toDate"`
+    OrderBy    string           `json:"orderBy"`
+    Search     string           `json:"search"`
+    Pagination PaginationParams `json:"pagination"`
+}
+```
+
+**Paginated response:** Use `PaginatedResponse[T]` from `routes.go` for all paginated endpoints:
+```go
+type PaginatedResponse[T any] struct {
+    Data       []T        `json:"data"`
+    Pagination Pagination `json:"pagination"`
+}
+
+type Pagination struct {
+    Page       int   `json:"page"`
+    PageSize   int   `json:"pageSize"`
+    Total      int64 `json:"total"`
+    TotalPages int64 `json:"totalPages"`
+}
+
+type PaginationParams struct {
+    Page     int `json:"page" binding:"min=1"`
+    PageSize int `json:"pageSize" binding:"min=1,max=100"`
+}
+```
+
 ### Adding a New Frontend Page
 
 1. **Create route folder**: `frontend/src/routes/new-page/`
 
-2. **Add page component**: `+page.svelte`
+2. **Add page component**: `+page.svelte` with the standard loading pattern:
    ```svelte
    <script lang="ts">
-     let data = $state<DataType[]>([])
+     import { onMount } from 'svelte'
+     import { api } from '$lib/api'
+     import { projectsState } from '$lib/state/projects.svelte'
+     import { ErrorDisplay } from '$lib/components/ui/error-display'
 
-     $effect(() => {
-       loadData()
-     })
+     let data = $state<DataType[]>([])
+     let loading = $state(true)
+     let error = $state('')
+     let notFound = $state(false)
+
+     async function loadData() {
+       loading = true
+       error = ''
+       try {
+         const response = await api.post<ResponseType>('/endpoint', payload, {
+           projectId: projectsState.currentProjectId ?? undefined
+         })
+         data = response.data || []
+       } catch (e: any) {
+         if (e.status === 404) {
+           notFound = true
+         } else {
+           error = e.message || 'Failed to load data'
+         }
+       } finally {
+         loading = false
+       }
+     }
+
+     onMount(() => { loadData() })
    </script>
+
+   {#if loading}
+     <LoadingCircle size="xlg" />
+   {:else if notFound}
+     <ErrorDisplay status={404} title="Not Found" description="..." onRetry={() => loadData()} />
+   {:else if error}
+     <ErrorDisplay status={400} title="Error" description={error} onRetry={() => loadData()} />
+   {:else}
+     <!-- Content -->
+   {/if}
    ```
 
-3. **Add data loading** (optional): `+page.ts`
+3. **Add data loading** (optional): `+page.ts` for URL params
    ```typescript
    export const load = async ({ params }) => {
        return { param: params.id }

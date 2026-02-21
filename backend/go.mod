@@ -10,13 +10,13 @@ require (
 	github.com/coreos/go-systemd/v22 v22.6.0
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/lib/pq v1.10.9
-	github.com/tracewayapp/go-lightning/lit v0.0.0-20260121181925-c304b0bdd0dc
-	go.tracewayapp.com v0.4.3
+	go.tracewayapp.com v1.0.1
 	go.tracewayapp.com/tracewaygin v0.4.3
 )
 
 require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
+	github.com/tracewayapp/lit v1.0.1 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/grpc v1.75.1 // indirect

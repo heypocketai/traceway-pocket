@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tracewayapp/go-lightning/lit"
+	"github.com/tracewayapp/lit"
 )
 
 type projectRepository struct{}

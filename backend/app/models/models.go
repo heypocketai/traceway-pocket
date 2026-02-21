@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/tracewayapp/go-lightning/lit"
+	"github.com/tracewayapp/lit"
 )
 
 var ExtensionModelRegistrations []func()
