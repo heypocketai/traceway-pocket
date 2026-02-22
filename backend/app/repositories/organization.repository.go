@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"backend/app/models"
+	"backend/app/db"
 	"database/sql"
 	"time"
 
@@ -43,22 +44,22 @@ func (r *organizationRepository) HasOrganizations(tx *sql.Tx) (bool, error) {
 }
 
 func (r *organizationRepository) FindById(tx *sql.Tx, id int) (*models.Organization, error) {
-	return lit.SelectSingle[models.Organization](
+	return lit.SelectSingleNamed[models.Organization](
 		tx,
-		"SELECT id, name, timezone, created_at FROM organizations WHERE id = $1",
-		id,
+		"SELECT id, name, timezone, created_at FROM organizations WHERE id = :id",
+		lit.P{"id": id},
 	)
 }
 
 func (r *organizationRepository) FindByUserId(tx *sql.Tx, userId int) ([]*models.Organization, error) {
-	return lit.Select[models.Organization](
+	return lit.SelectNamed[models.Organization](
 		tx,
 		`SELECT o.id, o.name, o.created_at
 		FROM organizations o
 		INNER JOIN organization_users ou ON o.id = ou.organization_id
-		WHERE ou.user_id = $1
+		WHERE ou.user_id = :user_id
 		ORDER BY o.created_at ASC`,
-		userId,
+		lit.P{"user_id": userId},
 	)
 }
 
@@ -80,11 +81,10 @@ func (r *organizationRepository) AddUser(tx *sql.Tx, organizationId int, userId 
 }
 
 func (r *organizationRepository) GetUserRole(tx *sql.Tx, organizationId int, userId int) (string, error) {
-	orgUser, err := lit.SelectSingle[models.OrganizationUser](
+	orgUser, err := lit.SelectSingleNamed[models.OrganizationUser](
 		tx,
-		"SELECT id, user_id, organization_id, role, created_at FROM organization_users WHERE organization_id = $1 AND user_id = $2",
-		organizationId,
-		userId,
+		"SELECT id, user_id, organization_id, role, created_at FROM organization_users WHERE organization_id = :org_id AND user_id = :user_id",
+		lit.P{"org_id": organizationId, "user_id": userId},
 	)
 	if err != nil {
 		return "", err
@@ -96,10 +96,10 @@ func (r *organizationRepository) GetUserRole(tx *sql.Tx, organizationId int, use
 }
 
 func (r *organizationRepository) CountMembers(tx *sql.Tx, organizationId int) (int, error) {
-	result, err := lit.SelectSingle[models.CountResult](
+	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
-		`SELECT COUNT(*) as count FROM organization_users WHERE organization_id = $1`,
-		organizationId,
+		`SELECT COUNT(*) as count FROM organization_users WHERE organization_id = :org_id`,
+		lit.P{"org_id": organizationId},
 	)
 	if err != nil {
 		return 0, err
@@ -111,14 +111,14 @@ func (r *organizationRepository) CountMembers(tx *sql.Tx, organizationId int) (i
 }
 
 func (r *organizationRepository) GetMembersWithDetails(tx *sql.Tx, organizationId int) ([]*models.OrganizationMember, error) {
-	return lit.Select[models.OrganizationMember](
+	return lit.SelectNamed[models.OrganizationMember](
 		tx,
 		`SELECT u.id, u.email, u.name, ou.role, ou.created_at
 		FROM users u
 		JOIN organization_users ou ON u.id = ou.user_id
-		WHERE ou.organization_id = $1
+		WHERE ou.organization_id = :org_id
 		ORDER BY ou.created_at ASC`,
-		organizationId,
+		lit.P{"org_id": organizationId},
 	)
 }
 
@@ -131,17 +131,15 @@ func (r *organizationRepository) IsOwner(tx *sql.Tx, organizationId int, userId 
 }
 
 func (r *organizationRepository) UpdateUserRole(tx *sql.Tx, organizationId int, userId int, role string) error {
-	return lit.UpdateNative(
-		tx,
-		"UPDATE organization_users SET role = $1 WHERE organization_id = $2 AND user_id = $3",
-		role,
-		organizationId,
-		userId,
-	)
+	q, a, err := lit.ParseNamedQuery(db.Driver, "UPDATE organization_users SET role = :role WHERE organization_id = :org_id AND user_id = :user_id", lit.P{"role": role, "org_id": organizationId, "user_id": userId})
+	if err != nil {
+		return err
+	}
+	return lit.UpdateNative(tx, q, a...)
 }
 
 func (r *organizationRepository) RemoveUser(tx *sql.Tx, organizationId int, userId int) error {
-	return lit.Delete(tx, "DELETE FROM organization_users WHERE organization_id = $1 AND user_id = $2", organizationId, userId)
+	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM organization_users WHERE organization_id = :org_id AND user_id = :user_id", lit.P{"org_id": organizationId, "user_id": userId})
 }
 
 func (r *organizationRepository) IsUserMember(tx *sql.Tx, organizationId int, userId int) (bool, error) {
@@ -153,14 +151,13 @@ func (r *organizationRepository) IsUserMember(tx *sql.Tx, organizationId int, us
 }
 
 func (r *organizationRepository) IsUserMemberByEmail(tx *sql.Tx, organizationId int, email string) (bool, error) {
-	result, err := lit.SelectSingle[models.CountResult](
+	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
 		`SELECT COUNT(*) as count
 		FROM organization_users ou
 		JOIN users u ON u.id = ou.user_id
-		WHERE ou.organization_id = $1 AND u.email = $2`,
-		organizationId,
-		email,
+		WHERE ou.organization_id = :org_id AND u.email = :email`,
+		lit.P{"org_id": organizationId, "email": email},
 	)
 	if err != nil {
 		return false, err
@@ -172,24 +169,23 @@ func (r *organizationRepository) IsUserMemberByEmail(tx *sql.Tx, organizationId 
 }
 
 func (r *organizationRepository) FindByUserIdWithRoles(tx *sql.Tx, userId int) ([]*models.UserOrganizationResponse, error) {
-	return lit.Select[models.UserOrganizationResponse](
+	return lit.SelectNamed[models.UserOrganizationResponse](
 		tx,
 		`SELECT o.id, o.name, ou.role, o.timezone
 		FROM organizations o
 		INNER JOIN organization_users ou ON o.id = ou.organization_id
-		WHERE ou.user_id = $1
+		WHERE ou.user_id = :user_id
 		ORDER BY o.created_at ASC`,
-		userId,
+		lit.P{"user_id": userId},
 	)
 }
 
 func (r *organizationRepository) UpdateTimezone(tx *sql.Tx, organizationId int, timezone string) error {
-	return lit.UpdateNative(
-		tx,
-		"UPDATE organizations SET timezone = $1 WHERE id = $2",
-		timezone,
-		organizationId,
-	)
+	q, a, err := lit.ParseNamedQuery(db.Driver, "UPDATE organizations SET timezone = :timezone WHERE id = :id", lit.P{"timezone": timezone, "id": organizationId})
+	if err != nil {
+		return err
+	}
+	return lit.UpdateNative(tx, q, a...)
 }
 
 var OrganizationRepository = organizationRepository{}

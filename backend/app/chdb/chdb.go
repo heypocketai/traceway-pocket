@@ -1,6 +1,7 @@
 package chdb
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"os"
@@ -11,10 +12,24 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 )
 
-var Conn *driver.Conn
+type ChConn interface {
+	Query(ctx context.Context, query string, args ...any) (driver.Rows, error)
+	QueryRow(ctx context.Context, query string, args ...any) driver.Row
+	PrepareBatch(ctx context.Context, query string, opts ...driver.PrepareBatchOption) (driver.Batch, error)
+	Exec(ctx context.Context, query string, args ...any) error
+}
 
-// Init initializes the Clickhouse connection pool
+var Conn ChConn
+
 func Init() error {
+	chType := os.Getenv("CLICKHOUSE_TYPE")
+	if chType == "embedded" {
+		return initEmbedded()
+	}
+	return initExternal()
+}
+
+func initExternal() error {
 	tlsConfig := &tls.Config{}
 
 	clickhouseServer := os.Getenv("CLICKHOUSE_SERVER")
@@ -61,7 +76,7 @@ func Init() error {
 		return err
 	}
 
-	Conn = &conn
+	Conn = conn
 
 	return nil
 }

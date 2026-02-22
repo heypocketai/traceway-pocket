@@ -2,7 +2,7 @@ package cache
 
 import (
 	"backend/app/models"
-	"backend/app/pgdb"
+	"backend/app/db"
 	"backend/app/repositories"
 	"context"
 	"database/sql"
@@ -32,7 +32,7 @@ func (c *projectCache) Init(ctx context.Context) error {
 }
 
 func (c *projectCache) Refresh(ctx context.Context) error {
-	projects, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
+	projects, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.Project, error) {
 		return repositories.ProjectRepository.FindAll(tx)
 	})
 	if err != nil {

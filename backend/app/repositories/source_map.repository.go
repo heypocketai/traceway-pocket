@@ -22,33 +22,30 @@ func (s *sourceMapRepository) Create(tx *sql.Tx, sm *models.SourceMap) (*models.
 }
 
 func (s *sourceMapRepository) Update(tx *sql.Tx, sm *models.SourceMap) error {
-	return lit.Update[models.SourceMap](tx, sm, "id = $1", sm.Id)
+	return lit.UpdateNamed[models.SourceMap](tx, sm, "id = :id", lit.P{"id": sm.Id})
 }
 
 func (s *sourceMapRepository) FindByProjectAndVersion(tx *sql.Tx, projectId uuid.UUID, version string) ([]*models.SourceMap, error) {
-	return lit.Select[models.SourceMap](
+	return lit.SelectNamed[models.SourceMap](
 		tx,
-		"SELECT * FROM source_maps WHERE project_id = $1 AND version = $2",
-		projectId,
-		version,
+		"SELECT * FROM source_maps WHERE project_id = :project_id AND version = :version",
+		lit.P{"project_id": projectId, "version": version},
 	)
 }
 
 func (s *sourceMapRepository) FindLatestByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.SourceMap, error) {
-	return lit.Select[models.SourceMap](
+	return lit.SelectNamed[models.SourceMap](
 		tx,
-		"SELECT * FROM source_maps WHERE project_id = $1 AND version = (SELECT version FROM source_maps WHERE project_id = $1 ORDER BY uploaded_at DESC LIMIT 1)",
-		projectId,
+		"SELECT * FROM source_maps WHERE project_id = :project_id AND version = (SELECT version FROM source_maps WHERE project_id = :project_id ORDER BY uploaded_at DESC LIMIT 1)",
+		lit.P{"project_id": projectId},
 	)
 }
 
 func (s *sourceMapRepository) FindByProjectVersionAndFileName(tx *sql.Tx, projectId uuid.UUID, version, fileName string) (*models.SourceMap, error) {
-	return lit.SelectSingle[models.SourceMap](
+	return lit.SelectSingleNamed[models.SourceMap](
 		tx,
-		"SELECT * FROM source_maps WHERE project_id = $1 AND version = $2 AND file_name = $3",
-		projectId,
-		version,
-		fileName,
+		"SELECT * FROM source_maps WHERE project_id = :project_id AND version = :version AND file_name = :file_name",
+		lit.P{"project_id": projectId, "version": version, "file_name": fileName},
 	)
 }
 

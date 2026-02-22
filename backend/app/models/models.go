@@ -4,24 +4,30 @@ import (
 	"github.com/tracewayapp/go-lightning/lit"
 )
 
-var ExtensionModelRegistrations []func()
+var ExtensionModelRegistrations []func(lit.Driver)
 
-func Init() {
-	lit.RegisterModel[Project](lit.PostgreSQL)
-	lit.RegisterModel[User](lit.PostgreSQL)
-	lit.RegisterModel[Organization](lit.PostgreSQL)
-	lit.RegisterModel[OrganizationUser](lit.PostgreSQL)
-	lit.RegisterModel[OrganizationMember](lit.PostgreSQL)
-	lit.RegisterModel[Invitation](lit.PostgreSQL)
-	lit.RegisterModel[InvitationWithInviter](lit.PostgreSQL)
-	lit.RegisterModel[UserOrganizationResponse](lit.PostgreSQL)
-	lit.RegisterModel[CountResult](lit.PostgreSQL)
-	lit.RegisterModel[SourceMap](lit.PostgreSQL)
-	lit.RegisterModel[MetricRegistry](lit.PostgreSQL)
-	lit.RegisterModel[WidgetGroup](lit.PostgreSQL)
-	lit.RegisterModel[WidgetGroupWidget](lit.PostgreSQL)
+type metricRegistryNaming struct{ lit.DefaultDbNamingStrategy }
+
+func (metricRegistryNaming) GetTableNameFromStructName(string) string {
+	return "metric_registry"
+}
+
+func Init(driver lit.Driver) {
+	lit.RegisterModel[Project](driver)
+	lit.RegisterModel[User](driver)
+	lit.RegisterModel[Organization](driver)
+	lit.RegisterModel[OrganizationUser](driver)
+	lit.RegisterModel[OrganizationMember](driver)
+	lit.RegisterModel[Invitation](driver)
+	lit.RegisterModel[InvitationWithInviter](driver)
+	lit.RegisterModel[UserOrganizationResponse](driver)
+	lit.RegisterModel[CountResult](driver)
+	lit.RegisterModel[SourceMap](driver)
+	lit.RegisterModelWithNaming[MetricRegistry](driver, metricRegistryNaming{})
+	lit.RegisterModel[WidgetGroup](driver)
+	lit.RegisterModel[WidgetGroupWidget](driver)
 
 	for _, register := range ExtensionModelRegistrations {
-		register()
+		register(driver)
 	}
 }

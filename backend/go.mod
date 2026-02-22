@@ -11,15 +11,40 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/lib/pq v1.10.9
 	github.com/tracewayapp/go-lightning/lit v0.0.0-20260121181925-c304b0bdd0dc
-	go.tracewayapp.com v0.4.3
+	go.tracewayapp.com v1.0.1
 	go.tracewayapp.com/tracewaygin v0.4.3
+	modernc.org/sqlite v1.18.1
 )
 
 require (
+	github.com/c-bata/go-prompt v0.2.6 // indirect
+	github.com/chdb-io/chdb-go v1.11.0 // indirect
+	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
+	github.com/huandu/go-sqlbuilder v1.27.3 // indirect
+	github.com/huandu/xstrings v1.4.0 // indirect
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/mattn/go-tty v0.0.5 // indirect
+	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/parquet-go/parquet-go v0.23.0 // indirect
+	github.com/pkg/term v1.2.0-beta.2 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/segmentio/encoding v0.4.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250825161204-c5933d9347a5 // indirect
 	google.golang.org/grpc v1.75.1 // indirect
+	lukechampine.com/uint128 v1.2.0 // indirect
+	modernc.org/cc/v3 v3.36.3 // indirect
+	modernc.org/ccgo/v3 v3.16.9 // indirect
+	modernc.org/libc v1.17.1 // indirect
+	modernc.org/mathutil v1.5.0 // indirect
+	modernc.org/memory v1.2.1 // indirect
+	modernc.org/opt v0.1.3 // indirect
+	modernc.org/strutil v1.1.3 // indirect
+	modernc.org/token v1.0.0 // indirect
 )
 
 require (
@@ -98,3 +123,5 @@ require (
 replace go.tracewayapp.com => /Users/dusanstanojevic/Documents/workspace/go-client
 
 replace go.tracewayapp.com/tracewaygin => /Users/dusanstanojevic/Documents/workspace/go-client/tracewaygin
+
+replace github.com/tracewayapp/go-lightning/lit => /Users/dusanstanojevic/Documents/workspace/go-lightning

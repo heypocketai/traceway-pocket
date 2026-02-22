@@ -5,7 +5,7 @@ import (
 	"backend/app/middleware"
 	"backend/app/models"
 	"backend/app/models/clientmodels"
-	"backend/app/pgdb"
+	"backend/app/db"
 	"backend/app/repositories"
 	"backend/app/services"
 	"backend/app/storage"
@@ -103,7 +103,7 @@ func (e clientController) Report(c *gin.Context) {
 
 		var sourceMaps *[]*models.SourceMap
 		if project != nil && isJsFramework(project.Framework) {
-			sourceMapsLoaded, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) ([]*models.SourceMap, error) {
+			sourceMapsLoaded, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.SourceMap, error) {
 				if request.AppVersion != "" {
 					return repositories.SourceMapRepository.FindByProjectAndVersion(tx, projectId, request.AppVersion)
 				}
@@ -244,7 +244,7 @@ func collectUniqueMetricNames(points []models.MetricPoint) []string {
 }
 
 func autoRegisterMetrics(projectId uuid.UUID, names []string) {
-	_, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (struct{}, error) {
+	_, err := db.ExecuteTransaction(func(tx *sql.Tx) (struct{}, error) {
 		return struct{}{}, repositories.MetricRegistryRepository.EnsureRegistered(tx, projectId, names)
 	})
 	if err != nil {

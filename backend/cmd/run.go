@@ -7,7 +7,7 @@ import (
 	"backend/app/middleware"
 	"backend/app/migrations"
 	"backend/app/models"
-	"backend/app/pgdb"
+	"backend/app/db"
 	"backend/app/services"
 	"backend/app/storage"
 	"backend/static"
@@ -35,9 +35,9 @@ func Run() {
 		panic(fmt.Errorf("failed to initialize JWT: %w", err))
 	}
 
-	err := pgdb.Init()
+	err := db.Init()
 	if err != nil {
-		panic(fmt.Errorf("error connecting to postgres: %w", err))
+		panic(fmt.Errorf("error connecting to database: %w", err))
 	}
 
 	err = chdb.Init()
@@ -45,13 +45,14 @@ func Run() {
 		panic(fmt.Errorf("error connecting to chdb: %w", err))
 	}
 
-	models.Init()
+	models.Init(db.Driver)
 
 	if err := storage.Init(); err != nil {
 		panic(fmt.Errorf("failed to initialize storage: %w", err))
 	}
 
-	err = migrations.Run()
+	dbType := os.Getenv("DB_TYPE")
+	err = migrations.Run(dbType)
 	if err != nil {
 		panic(fmt.Errorf("migrations run failed: %w", err))
 	}

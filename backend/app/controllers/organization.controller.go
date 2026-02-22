@@ -3,7 +3,7 @@ package controllers
 import (
 	"backend/app/middleware"
 	"backend/app/models"
-	"backend/app/pgdb"
+	"backend/app/db"
 	"backend/app/repositories"
 	"database/sql"
 	"net/http"
@@ -25,7 +25,7 @@ func (c *organizationController) GetSettings(ctx *gin.Context) {
 		Invitations  []*models.InvitationWithInviter
 	}
 
-	data, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (*settingsData, error) {
+	data, err := db.ExecuteTransaction(func(tx *sql.Tx) (*settingsData, error) {
 		org, err := repositories.OrganizationRepository.FindById(tx, organizationId)
 		if err != nil {
 			return nil, err
@@ -69,7 +69,7 @@ func (c *organizationController) GetSettings(ctx *gin.Context) {
 func (c *organizationController) GetMembers(ctx *gin.Context) {
 	organizationId := middleware.GetOrganizationId(ctx)
 
-	members, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) ([]*models.OrganizationMember, error) {
+	members, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.OrganizationMember, error) {
 		return repositories.OrganizationRepository.GetMembersWithDetails(tx, organizationId)
 	})
 

@@ -25,18 +25,20 @@ type projectWithRole struct {
 }
 
 func init() {
-	lit.RegisterModel[projectWithRole](lit.PostgreSQL)
+	models.ExtensionModelRegistrations = append(models.ExtensionModelRegistrations, func(driver lit.Driver) {
+		lit.RegisterModel[projectWithRole](driver)
+	})
 }
 
 func (p *projectRepository) FindAllWithBackendUrlByUserId(tx *sql.Tx, userId int) ([]*models.ProjectWithBackendUrl, error) {
-	rows, err := lit.Select[projectWithRole](
+	rows, err := lit.SelectNamed[projectWithRole](
 		tx,
 		`SELECT DISTINCT p.id, p.name, p.token, p.framework, p.organization_id, p.created_at, p.source_map_token, ou.role
 		FROM projects p
 		INNER JOIN organization_users ou ON p.organization_id = ou.organization_id
-		WHERE ou.user_id = $1
+		WHERE ou.user_id = :user_id
 		ORDER BY p.created_at ASC`,
-		userId,
+		lit.P{"user_id": userId},
 	)
 	if err != nil {
 		return nil, err
@@ -74,18 +76,18 @@ func (p *projectRepository) FindAll(tx *sql.Tx) ([]*models.Project, error) {
 }
 
 func (p *projectRepository) FindByToken(tx *sql.Tx, token string) (*models.Project, error) {
-	return lit.SelectSingle[models.Project](
+	return lit.SelectSingleNamed[models.Project](
 		tx,
-		"SELECT id, name, token, framework, organization_id, created_at, source_map_token FROM projects WHERE token = $1",
-		token,
+		"SELECT id, name, token, framework, organization_id, created_at, source_map_token FROM projects WHERE token = :token",
+		lit.P{"token": token},
 	)
 }
 
 func (p *projectRepository) FindById(tx *sql.Tx, id uuid.UUID) (*models.Project, error) {
-	return lit.SelectSingle[models.Project](
+	return lit.SelectSingleNamed[models.Project](
 		tx,
-		"SELECT id, name, token, framework, organization_id, created_at, source_map_token FROM projects WHERE id = $1",
-		id,
+		"SELECT id, name, token, framework, organization_id, created_at, source_map_token FROM projects WHERE id = :id",
+		lit.P{"id": id},
 	)
 }
 
@@ -125,34 +127,33 @@ func (p *projectRepository) CreateWithOrganization(tx *sql.Tx, name string, fram
 }
 
 func (p *projectRepository) FindByOrganizationId(tx *sql.Tx, organizationId int) ([]*models.Project, error) {
-	return lit.Select[models.Project](
+	return lit.SelectNamed[models.Project](
 		tx,
-		"SELECT id, name, token, framework, organization_id, created_at, source_map_token FROM projects WHERE organization_id = $1 ORDER BY created_at ASC",
-		organizationId,
+		"SELECT id, name, token, framework, organization_id, created_at, source_map_token FROM projects WHERE organization_id = :org_id ORDER BY created_at ASC",
+		lit.P{"org_id": organizationId},
 	)
 }
 
-// FindByUserId returns all projects belonging to organizations the user is a member of
 func (p *projectRepository) FindByUserId(tx *sql.Tx, userId int) ([]*models.Project, error) {
-	return lit.Select[models.Project](
+	return lit.SelectNamed[models.Project](
 		tx,
 		`SELECT DISTINCT p.id, p.name, p.token, p.framework, p.organization_id, p.created_at, p.source_map_token
 		FROM projects p
 		INNER JOIN organization_users ou ON p.organization_id = ou.organization_id
-		WHERE ou.user_id = $1
+		WHERE ou.user_id = :user_id
 		ORDER BY p.created_at ASC`,
-		userId,
+		lit.P{"user_id": userId},
 	)
 }
+
 func (p *projectRepository) UserHasAccess(tx *sql.Tx, projectId uuid.UUID, userId int) (bool, error) {
-	result, err := lit.SelectSingle[models.CountResult](
+	result, err := lit.SelectSingleNamed[models.CountResult](
 		tx,
 		`SELECT COUNT(*) as count
 		FROM projects p
 		INNER JOIN organization_users ou ON p.organization_id = ou.organization_id
-		WHERE p.id = $1 AND ou.user_id = $2`,
-		projectId,
-		userId,
+		WHERE p.id = :project_id AND ou.user_id = :user_id`,
+		lit.P{"project_id": projectId, "user_id": userId},
 	)
 	if err != nil {
 		return false, err
@@ -175,7 +176,7 @@ func (p *projectRepository) GenerateSourceMapToken(tx *sql.Tx, projectId uuid.UU
 
 	token := generateSecureToken()
 	project.SourceMapToken = &token
-	err = lit.Update[models.Project](tx, project, "id = $1", projectId)
+	err = lit.UpdateNamed[models.Project](tx, project, "id = :id", lit.P{"id": projectId})
 	if err != nil {
 		return "", err
 	}
@@ -183,10 +184,10 @@ func (p *projectRepository) GenerateSourceMapToken(tx *sql.Tx, projectId uuid.UU
 }
 
 func (p *projectRepository) FindBySourceMapToken(tx *sql.Tx, token string) (*models.Project, error) {
-	return lit.SelectSingle[models.Project](
+	return lit.SelectSingleNamed[models.Project](
 		tx,
-		"SELECT id, name, token, framework, organization_id, created_at, source_map_token FROM projects WHERE source_map_token = $1",
-		token,
+		"SELECT id, name, token, framework, organization_id, created_at, source_map_token FROM projects WHERE source_map_token = :smt",
+		lit.P{"smt": token},
 	)
 }
 

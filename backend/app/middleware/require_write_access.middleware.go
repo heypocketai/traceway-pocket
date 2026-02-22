@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"backend/app/cache"
-	"backend/app/pgdb"
+	"backend/app/db"
 	"backend/app/repositories"
 	"database/sql"
 	"net/http"
@@ -42,7 +42,7 @@ func InitRequireWriteAccess() {
 			return
 		}
 
-		role, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
+		role, err := db.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
 			return repositories.OrganizationRepository.GetUserRole(tx, *project.OrganizationId, userId)
 		})
 

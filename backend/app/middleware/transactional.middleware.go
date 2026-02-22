@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"backend/app/pgdb"
+	"backend/app/db"
 	"database/sql"
 	"net/http"
 
@@ -11,7 +11,7 @@ import (
 const TransactionContextKey = "dbTx"
 
 func Transactional(c *gin.Context) {
-	txHandle, err := pgdb.DB.Begin()
+	txHandle, err := db.DB.Begin()
 
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)

@@ -3,7 +3,7 @@ package controllers
 import (
 	"backend/app/middleware"
 	"backend/app/models"
-	"backend/app/pgdb"
+	"backend/app/db"
 	"backend/app/repositories"
 	"backend/app/services"
 	"database/sql"
@@ -62,7 +62,7 @@ func (c *passwordResetController) ForgotPassword(ctx *gin.Context) {
 func (c *passwordResetController) ValidateToken(ctx *gin.Context) {
 	token := ctx.Param("token")
 
-	user, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (*models.User, error) {
+	user, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.User, error) {
 		return repositories.UserRepository.FindByPasswordResetToken(tx, token)
 	})
 

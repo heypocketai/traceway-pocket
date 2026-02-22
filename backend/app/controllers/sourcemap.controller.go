@@ -3,7 +3,7 @@ package controllers
 import (
 	"backend/app/middleware"
 	"backend/app/models"
-	"backend/app/pgdb"
+	"backend/app/db"
 	"backend/app/repositories"
 	"backend/app/storage"
 	"database/sql"
@@ -73,7 +73,7 @@ func (s sourceMapController) Upload(c *gin.Context) {
 			return
 		}
 
-		_, err = pgdb.ExecuteTransaction(func(tx *sql.Tx) (*models.SourceMap, error) {
+		_, err = db.ExecuteTransaction(func(tx *sql.Tx) (*models.SourceMap, error) {
 			existing, err := repositories.SourceMapRepository.FindByProjectVersionAndFileName(tx, projectId, version, fileHeader.Filename)
 			if err != nil {
 				return nil, err

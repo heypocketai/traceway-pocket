@@ -1,16 +1,32 @@
-package pgdb
+package db
 
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 
 	_ "github.com/lib/pq"
+	"github.com/tracewayapp/go-lightning/lit"
+	_ "modernc.org/sqlite"
 )
 
 var DB *sql.DB
+var Driver lit.Driver = lit.PostgreSQL
+
+func IsSQLite() bool {
+	return Driver == lit.SQLite
+}
 
 func Init() error {
+	dbType := os.Getenv("DB_TYPE")
+	if dbType == "sqlite" {
+		return initSQLite()
+	}
+	return initPostgres()
+}
+
+func initPostgres() error {
 	host := os.Getenv("POSTGRES_HOST")
 	port := os.Getenv("POSTGRES_PORT")
 	database := os.Getenv("POSTGRES_DATABASE")
@@ -43,6 +59,39 @@ func Init() error {
 	db.SetMaxIdleConns(25)
 
 	DB = db
+	Driver = lit.PostgreSQL
+
+	return nil
+}
+
+func initSQLite() error {
+	path := os.Getenv("SQLITE_PATH")
+	if path == "" {
+		path = "./traceway.db"
+	}
+
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return fmt.Errorf("failed to open sqlite connection: %w", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("failed to ping sqlite: %w", err)
+	}
+
+	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		return fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
+	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
+		return fmt.Errorf("failed to set WAL mode: %w", err)
+	}
+
+	db.SetMaxOpenConns(1)
+
+	DB = db
+	Driver = lit.SQLite
+
+	log.Printf("SQLite database opened at %s", path)
 
 	return nil
 }

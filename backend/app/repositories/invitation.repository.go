@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"backend/app/models"
+	"backend/app/db"
 	"database/sql"
 	"time"
 
@@ -35,48 +36,47 @@ func (r *invitationRepository) Create(tx *sql.Tx, organizationId int, email stri
 }
 
 func (r *invitationRepository) FindByToken(tx *sql.Tx, token string) (*models.Invitation, error) {
-	return lit.SelectSingle[models.Invitation](
+	return lit.SelectSingleNamed[models.Invitation](
 		tx,
 		`SELECT id, organization_id, email, role, token, invited_by, status, expires_at, accepted_at, created_at
 		FROM invitations
-		WHERE token = $1`,
-		token,
+		WHERE token = :token`,
+		lit.P{"token": token},
 	)
 }
 
 func (r *invitationRepository) FindByOrganization(tx *sql.Tx, organizationId int) ([]*models.InvitationWithInviter, error) {
-	return lit.Select[models.InvitationWithInviter](
+	return lit.SelectNamed[models.InvitationWithInviter](
 		tx,
 		`SELECT i.id, i.organization_id, i.email, i.role, i.invited_by, u.name as inviter_name, i.status, i.expires_at, i.accepted_at, i.created_at
 		FROM invitations i
 		JOIN users u ON i.invited_by = u.id
-		WHERE i.organization_id = $1 AND i.status = 'pending'
+		WHERE i.organization_id = :org_id AND i.status = 'pending'
 		ORDER BY i.created_at DESC`,
-		organizationId,
+		lit.P{"org_id": organizationId},
 	)
 }
 
 func (r *invitationRepository) Update(tx *sql.Tx, invitation *models.Invitation) error {
-	return lit.Update[models.Invitation](
+	return lit.UpdateNamed[models.Invitation](
 		tx,
 		invitation,
-		"id = $1",
-		invitation.Id,
+		"id = :id",
+		lit.P{"id": invitation.Id},
 	)
 }
 
 func (r *invitationRepository) Delete(tx *sql.Tx, id int) error {
-	return lit.Delete(tx, "DELETE FROM invitations WHERE id = $1", id)
+	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM invitations WHERE id = :id", lit.P{"id": id})
 }
 
 func (r *invitationRepository) HasPendingInvitation(tx *sql.Tx, email string, organizationId int) (bool, error) {
-	invitation, err := lit.SelectSingle[models.Invitation](
+	invitation, err := lit.SelectSingleNamed[models.Invitation](
 		tx,
 		`SELECT id, organization_id, email, role, token, invited_by, status, expires_at, accepted_at, created_at
 		FROM invitations
-		WHERE email = $1 AND organization_id = $2 AND status = 'pending'`,
-		email,
-		organizationId,
+		WHERE email = :email AND organization_id = :org_id AND status = 'pending'`,
+		lit.P{"email": email, "org_id": organizationId},
 	)
 	if err != nil {
 		return false, err
@@ -85,12 +85,12 @@ func (r *invitationRepository) HasPendingInvitation(tx *sql.Tx, email string, or
 }
 
 func (r *invitationRepository) FindById(tx *sql.Tx, id int) (*models.Invitation, error) {
-	return lit.SelectSingle[models.Invitation](
+	return lit.SelectSingleNamed[models.Invitation](
 		tx,
 		`SELECT id, organization_id, email, role, token, invited_by, status, expires_at, accepted_at, created_at
 		FROM invitations
-		WHERE id = $1`,
-		id,
+		WHERE id = :id`,
+		lit.P{"id": id},
 	)
 }
 

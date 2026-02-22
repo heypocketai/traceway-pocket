@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"backend/app/models"
+	"backend/app/db"
 	"database/sql"
 
 	"github.com/google/uuid"
@@ -11,18 +12,18 @@ import (
 type widgetGroupRepository struct{}
 
 func (r *widgetGroupRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.WidgetGroup, error) {
-	return lit.Select[models.WidgetGroup](
+	return lit.SelectNamed[models.WidgetGroup](
 		tx,
-		"SELECT id, project_id, name, description, is_default, created_by, created_at, updated_at FROM widget_groups WHERE project_id = $1 ORDER BY is_default DESC, name ASC",
-		projectId,
+		"SELECT id, project_id, name, description, is_default, created_by, created_at, updated_at FROM widget_groups WHERE project_id = :project_id ORDER BY is_default DESC, name ASC",
+		lit.P{"project_id": projectId},
 	)
 }
 
 func (r *widgetGroupRepository) FindById(tx *sql.Tx, id int) (*models.WidgetGroup, error) {
-	return lit.SelectSingle[models.WidgetGroup](
+	return lit.SelectSingleNamed[models.WidgetGroup](
 		tx,
-		"SELECT id, project_id, name, description, is_default, created_by, created_at, updated_at FROM widget_groups WHERE id = $1",
-		id,
+		"SELECT id, project_id, name, description, is_default, created_by, created_at, updated_at FROM widget_groups WHERE id = :id",
+		lit.P{"id": id},
 	)
 }
 
@@ -31,26 +32,26 @@ func (r *widgetGroupRepository) Create(tx *sql.Tx, group *models.WidgetGroup) (i
 }
 
 func (r *widgetGroupRepository) Update(tx *sql.Tx, group *models.WidgetGroup) error {
-	return lit.Update(tx, group, "id = $1", group.Id)
+	return lit.UpdateNamed(tx, group, "id = :id", lit.P{"id": group.Id})
 }
 
 func (r *widgetGroupRepository) Delete(tx *sql.Tx, id int) error {
-	return lit.Delete(tx, "DELETE FROM widget_groups WHERE id = $1", id)
+	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM widget_groups WHERE id = :id", lit.P{"id": id})
 }
 
 func (r *widgetGroupRepository) FindWidgetsByGroup(tx *sql.Tx, widgetGroupId int) ([]*models.WidgetGroupWidget, error) {
-	return lit.Select[models.WidgetGroupWidget](
+	return lit.SelectNamed[models.WidgetGroupWidget](
 		tx,
-		"SELECT id, widget_group_id, title, widget_type, config, position, created_at, updated_at FROM widget_group_widgets WHERE widget_group_id = $1 ORDER BY position ASC",
-		widgetGroupId,
+		"SELECT id, widget_group_id, title, widget_type, config, position, created_at, updated_at FROM widget_group_widgets WHERE widget_group_id = :wg_id ORDER BY position ASC",
+		lit.P{"wg_id": widgetGroupId},
 	)
 }
 
 func (r *widgetGroupRepository) FindWidgetById(tx *sql.Tx, id int) (*models.WidgetGroupWidget, error) {
-	return lit.SelectSingle[models.WidgetGroupWidget](
+	return lit.SelectSingleNamed[models.WidgetGroupWidget](
 		tx,
-		"SELECT id, widget_group_id, title, widget_type, config, position, created_at, updated_at FROM widget_group_widgets WHERE id = $1",
-		id,
+		"SELECT id, widget_group_id, title, widget_type, config, position, created_at, updated_at FROM widget_group_widgets WHERE id = :id",
+		lit.P{"id": id},
 	)
 }
 
@@ -59,11 +60,11 @@ func (r *widgetGroupRepository) CreateWidget(tx *sql.Tx, widget *models.WidgetGr
 }
 
 func (r *widgetGroupRepository) UpdateWidget(tx *sql.Tx, widget *models.WidgetGroupWidget) error {
-	return lit.Update(tx, widget, "id = $1", widget.Id)
+	return lit.UpdateNamed(tx, widget, "id = :id", lit.P{"id": widget.Id})
 }
 
 func (r *widgetGroupRepository) DeleteWidget(tx *sql.Tx, id int) error {
-	return lit.Delete(tx, "DELETE FROM widget_group_widgets WHERE id = $1", id)
+	return lit.DeleteNamed(db.Driver, tx, "DELETE FROM widget_group_widgets WHERE id = :id", lit.P{"id": id})
 }
 
 var WidgetGroupRepository = widgetGroupRepository{}

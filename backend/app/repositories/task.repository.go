@@ -16,7 +16,7 @@ import (
 type taskRepository struct{}
 
 func (e *taskRepository) InsertAsync(ctx context.Context, lines []models.Task) error {
-	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO tasks (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name)")
+	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO tasks (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name)")
 	if err != nil {
 		return err
 	}
@@ -36,13 +36,13 @@ func (e *taskRepository) InsertAsync(ctx context.Context, lines []models.Task) e
 
 func (e *taskRepository) CountBetween(ctx context.Context, projectId uuid.UUID, start, end time.Time) (int64, error) {
 	var count uint64
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT count() FROM tasks WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, start, end).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, "SELECT count() FROM tasks WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, start, end).Scan(&count)
 	return int64(count), err
 }
 
 func (e *taskRepository) FindAll(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string) ([]models.Task, int64, error) {
 	var count uint64
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT count() FROM tasks WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, fromDate, toDate).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, "SELECT count() FROM tasks WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, fromDate, toDate).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -59,7 +59,7 @@ func (e *taskRepository) FindAll(ctx context.Context, projectId uuid.UUID, fromD
 	}
 
 	query := "SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name FROM tasks WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -86,7 +86,7 @@ func (e *taskRepository) FindAll(ctx context.Context, projectId uuid.UUID, fromD
 func (e *taskRepository) FindGroupedByTaskName(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string) ([]models.TaskStats, int64, error) {
 	// Count unique task names
 	var count uint64
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT uniq(task_name) FROM tasks WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, fromDate, toDate).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, "SELECT uniq(task_name) FROM tasks WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, fromDate, toDate).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -127,7 +127,7 @@ func (e *taskRepository) FindGroupedByTaskName(ctx context.Context, projectId uu
 	ORDER BY ` + orderExpr + ` ` + sortDir + `
 	LIMIT ? OFFSET ?`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -151,7 +151,7 @@ func (e *taskRepository) FindGroupedByTaskName(ctx context.Context, projectId uu
 
 func (e *taskRepository) FindByTaskName(ctx context.Context, projectId uuid.UUID, taskName string, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string) ([]models.Task, int64, error) {
 	var count uint64
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT count() FROM tasks WHERE project_id = ? AND task_name = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, taskName, fromDate, toDate).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, "SELECT count() FROM tasks WHERE project_id = ? AND task_name = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, taskName, fromDate, toDate).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -174,7 +174,7 @@ func (e *taskRepository) FindByTaskName(ctx context.Context, projectId uuid.UUID
 	}
 
 	query := "SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name FROM tasks WHERE project_id = ? AND task_name = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " " + sortDir + " LIMIT ? OFFSET ?"
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, taskName, fromDate, toDate, pageSize, offset)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, taskName, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -208,7 +208,7 @@ func (e *taskRepository) FindById(ctx context.Context, projectId, taskId uuid.UU
 	var t models.Task
 	var attributesJSON string
 
-	err := (*chdb.Conn).QueryRow(ctx, query, projectId, taskId).Scan(
+	err := chdb.Conn.QueryRow(ctx, query, projectId, taskId).Scan(
 		&t.Id, &t.ProjectId, &t.TaskName, &t.Duration, &t.RecordedAt,
 		&t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName)
 
@@ -238,7 +238,7 @@ func (e *taskRepository) CountByHour(ctx context.Context, projectId uuid.UUID, s
 	GROUP BY hour
 	ORDER BY hour ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +266,7 @@ func (e *taskRepository) AvgDurationByHour(ctx context.Context, projectId uuid.U
 	GROUP BY hour
 	ORDER BY hour ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (e *taskRepository) CountByInterval(ctx context.Context, projectId uuid.UUI
 	GROUP BY bucket
 	ORDER BY bucket ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, intervalMinutes, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +322,7 @@ func (e *taskRepository) AvgDurationByInterval(ctx context.Context, projectId uu
 	GROUP BY bucket
 	ORDER BY bucket ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, intervalMinutes, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ func (e *taskRepository) FindWorstTasks(ctx context.Context, projectId uuid.UUID
 	ORDER BY count * (p95_duration - p50_duration) DESC
 	LIMIT ?`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end, limit)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, start, end, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func (e *taskRepository) GetTaskStats(ctx context.Context, projectId uuid.UUID, 
 	var stats models.TaskDetailStats
 	var count uint64
 
-	err := (*chdb.Conn).QueryRow(ctx, query, projectId, taskName, start, end).Scan(
+	err := chdb.Conn.QueryRow(ctx, query, projectId, taskName, start, end).Scan(
 		&count,
 		&stats.AvgDuration,
 		&stats.MedianDuration,
