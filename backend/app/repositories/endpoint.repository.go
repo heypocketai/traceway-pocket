@@ -1,8 +1,8 @@
 package repositories
 
 import (
-	"backend/app/chdb"
-	"backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/chdb"
+	"github.com/tracewayapp/traceway/backend/app/models"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -16,7 +16,7 @@ import (
 type endpointRepository struct{}
 
 func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.Endpoint) error {
-	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO endpoints (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name)")
+	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO endpoints (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name)")
 	if err != nil {
 		return err
 	}
@@ -36,13 +36,13 @@ func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.End
 
 func (e *endpointRepository) CountBetween(ctx context.Context, projectId uuid.UUID, start, end time.Time) (int64, error) {
 	var count uint64
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT count() FROM endpoints WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, start, end).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, "SELECT count() FROM endpoints WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, start, end).Scan(&count)
 	return int64(count), err
 }
 
 func (e *endpointRepository) FindAll(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy string) ([]models.Endpoint, int64, error) {
 	var count uint64
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT count() FROM endpoints WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, fromDate, toDate).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, "SELECT count() FROM endpoints WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, fromDate, toDate).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -61,7 +61,7 @@ func (e *endpointRepository) FindAll(ctx context.Context, projectId uuid.UUID, f
 	}
 
 	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name FROM endpoints WHERE project_id = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " DESC LIMIT ? OFFSET ?"
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -101,7 +101,7 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 	// Count unique endpoints
 	var count uint64
 	countQuery := "SELECT uniq(endpoint) FROM endpoints WHERE " + whereClause
-	err := (*chdb.Conn).QueryRow(ctx, countQuery, args...).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, countQuery, args...).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -195,7 +195,7 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 	// Add pagination args
 	queryArgs := append(args, pageSize, offset)
 
-	rows, err := (*chdb.Conn).Query(ctx, query, queryArgs...)
+	rows, err := chdb.Conn.Query(ctx, query, queryArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -225,7 +225,7 @@ func (e *endpointRepository) FindGroupedByEndpoint(ctx context.Context, projectI
 
 func (e *endpointRepository) FindByEndpoint(ctx context.Context, projectId uuid.UUID, endpoint string, fromDate, toDate time.Time, page, pageSize int, orderBy string, sortDirection string) ([]models.Endpoint, int64, error) {
 	var count uint64
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT count() FROM endpoints WHERE project_id = ? AND endpoint = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, endpoint, fromDate, toDate).Scan(&count)
+	err := chdb.Conn.QueryRow(ctx, "SELECT count() FROM endpoints WHERE project_id = ? AND endpoint = ? AND recorded_at >= ? AND recorded_at <= ?", projectId, endpoint, fromDate, toDate).Scan(&count)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -250,7 +250,7 @@ func (e *endpointRepository) FindByEndpoint(ctx context.Context, projectId uuid.
 	}
 
 	query := "SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name FROM endpoints WHERE project_id = ? AND endpoint = ? AND recorded_at >= ? AND recorded_at <= ? ORDER BY " + orderBy + " " + sortDir + " LIMIT ? OFFSET ?"
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, endpoint, fromDate, toDate, pageSize, offset)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, endpoint, fromDate, toDate, pageSize, offset)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -284,7 +284,7 @@ func (e *endpointRepository) FindById(ctx context.Context, projectId, endpointId
 	var t models.Endpoint
 	var attributesJSON string
 
-	err := (*chdb.Conn).QueryRow(ctx, query, projectId, endpointId).Scan(
+	err := chdb.Conn.QueryRow(ctx, query, projectId, endpointId).Scan(
 		&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt,
 		&t.StatusCode, &t.BodySize, &t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName)
 
@@ -314,7 +314,7 @@ func (e *endpointRepository) CountByHour(ctx context.Context, projectId uuid.UUI
 	GROUP BY hour
 	ORDER BY hour ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +342,7 @@ func (e *endpointRepository) AvgDurationByHour(ctx context.Context, projectId uu
 	GROUP BY hour
 	ORDER BY hour ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +370,7 @@ func (e *endpointRepository) ErrorRateByHour(ctx context.Context, projectId uuid
 	GROUP BY hour
 	ORDER BY hour ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -398,7 +398,7 @@ func (e *endpointRepository) CountByInterval(ctx context.Context, projectId uuid
 	GROUP BY bucket
 	ORDER BY bucket ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, intervalMinutes, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -426,7 +426,7 @@ func (e *endpointRepository) AvgDurationByInterval(ctx context.Context, projectI
 	GROUP BY bucket
 	ORDER BY bucket ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, intervalMinutes, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -454,7 +454,7 @@ func (e *endpointRepository) ErrorRateByInterval(ctx context.Context, projectId 
 	GROUP BY bucket
 	ORDER BY bucket ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, intervalMinutes, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, intervalMinutes, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -535,7 +535,7 @@ func (e *endpointRepository) FindWorstEndpoints(ctx context.Context, projectId u
 	ORDER BY impact DESC
 	LIMIT ?`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end, limit)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, start, end, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -589,7 +589,7 @@ func (e *endpointRepository) GetEndpointStats(ctx context.Context, projectId uui
 	var count uint64
 	var satisfiedTolerating float64
 
-	err := (*chdb.Conn).QueryRow(ctx, query, projectId, endpoint, start, end).Scan(
+	err := chdb.Conn.QueryRow(ctx, query, projectId, endpoint, start, end).Scan(
 		&count,
 		&stats.AvgDuration,
 		&stats.MedianDuration,
@@ -648,7 +648,7 @@ func (e *endpointRepository) GetEndpointStackedChart(ctx context.Context, projec
 			LIMIT 5`
 	}
 
-	rows, err := (*chdb.Conn).Query(ctx, rankQuery, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, rankQuery, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -710,7 +710,7 @@ func (e *endpointRepository) GetEndpointStackedChart(ctx context.Context, projec
 	}
 	args = append(args, projectId, start, end)
 
-	rows, err = (*chdb.Conn).Query(ctx, timeSeriesQuery, args...)
+	rows, err = chdb.Conn.Query(ctx, timeSeriesQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -746,16 +746,16 @@ func (e *endpointRepository) GetEndpointStackedChart(ctx context.Context, projec
 func (e *endpointRepository) GetSlowEndpoint(ctx context.Context, projectId uuid.UUID, endpoint string) (uint32, string, error) {
 	var offsetMs uint32
 	var reason string
-	err := (*chdb.Conn).QueryRow(ctx, "SELECT offset_ms, reason FROM slow_endpoints FINAL WHERE project_id = ? AND endpoint = ?", projectId, endpoint).Scan(&offsetMs, &reason)
+	err := chdb.Conn.QueryRow(ctx, "SELECT offset_ms, reason FROM slow_endpoints FINAL WHERE project_id = ? AND endpoint = ?", projectId, endpoint).Scan(&offsetMs, &reason)
 	return offsetMs, reason, err
 }
 
 func (e *endpointRepository) UpsertSlowEndpoint(ctx context.Context, projectId uuid.UUID, endpoint string, offsetMs uint32, reason string) error {
-	err := (*chdb.Conn).Exec(ctx, "ALTER TABLE slow_endpoints DELETE WHERE project_id = ? AND endpoint = ?", projectId, endpoint)
+	err := chdb.Conn.Exec(ctx, "ALTER TABLE slow_endpoints DELETE WHERE project_id = ? AND endpoint = ?", projectId, endpoint)
 	if err != nil {
 		return err
 	}
-	batch, err := (*chdb.Conn).PrepareBatch(ctx, "INSERT INTO slow_endpoints (project_id, endpoint, offset_ms, reason)")
+	batch, err := chdb.Conn.PrepareBatch(ctx, "INSERT INTO slow_endpoints (project_id, endpoint, offset_ms, reason)")
 	if err != nil {
 		return err
 	}

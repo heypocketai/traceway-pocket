@@ -1,3 +1,5 @@
+//go:build !localdist
+
 package static
 
 import (
@@ -5,10 +7,9 @@ import (
 	"io/fs"
 )
 
-//go:embed all:dist
+//go:embed all:frontend
 var staticFiles embed.FS
 
-// GetStaticFS returns the embedded static filesystem rooted at dist/
 func GetStaticFS() (fs.FS, error) {
-	return fs.Sub(staticFiles, "dist")
+	return fs.Sub(staticFiles, "frontend")
 }

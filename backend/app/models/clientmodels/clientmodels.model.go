@@ -1,7 +1,7 @@
 package clientmodels
 
 import (
-	"backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/models"
 	"encoding/json"
 	"time"
 

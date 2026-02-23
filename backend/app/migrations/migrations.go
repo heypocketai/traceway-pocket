@@ -5,7 +5,12 @@ import (
 	"embed"
 	"fmt"
 	"net/url"
-	"os"
+	"sort"
+	"strings"
+
+	"github.com/tracewayapp/traceway/backend/app/chdb"
+	"github.com/tracewayapp/traceway/backend/app/config"
+	"github.com/tracewayapp/traceway/backend/app/db"
 
 	"github.com/golang-migrate/migrate/v4"
 	migrateCh "github.com/golang-migrate/migrate/v4/database/clickhouse"
@@ -27,6 +32,9 @@ var migrationsChFS embed.FS
 
 //go:embed pg/*.sql
 var migrationsPgFS embed.FS
+
+//go:embed sqlite/*.sql
+var migrationsSqliteFS embed.FS
 
 func runMigrationsClickhouse(connStr string) error {
 	db, err := sql.Open("clickhouse", connStr)
@@ -124,31 +132,157 @@ func runExtensionMigrations(db *sql.DB, ext ExtensionMigration) error {
 	return nil
 }
 
-func Run() error {
-	// Run ClickHouse migrations
-	clickhouseServer := os.Getenv("CLICKHOUSE_SERVER")
-	clickhouseDatabase := os.Getenv("CLICKHOUSE_DATABASE")
-	clickhouseUsername := os.Getenv("CLICKHOUSE_USERNAME")
-	clickhousePassword := os.Getenv("CLICKHOUSE_PASSWORD")
-	clickhouseTls := os.Getenv("CLICKHOUSE_TLS")
-
-	tlsConfig := "&secure=true"
-	if clickhouseTls == "false" {
-		tlsConfig = ""
+func runMigrationsSQLite(db *sql.DB) error {
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		version TEXT PRIMARY KEY,
+		applied_at DATETIME DEFAULT (datetime('now'))
+	)`)
+	if err != nil {
+		return fmt.Errorf("failed to create schema_migrations table: %w", err)
 	}
 
-	err := runMigrationsClickhouse(fmt.Sprintf(`clickhouse://%s?username=%s&password=%s&database=%s%s`, clickhouseServer, url.QueryEscape(clickhouseUsername), url.QueryEscape(clickhousePassword), clickhouseDatabase, tlsConfig))
+	entries, err := migrationsSqliteFS.ReadDir("sqlite")
 	if err != nil {
-		return fmt.Errorf("clickhouse migrations failed: %w", err)
+		return fmt.Errorf("failed to read sqlite migrations dir: %w", err)
+	}
+
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".up.sql") {
+			files = append(files, e.Name())
+		}
+	}
+	sort.Strings(files)
+
+	for _, file := range files {
+		version := strings.TrimSuffix(file, ".up.sql")
+
+		var count int
+		err := db.QueryRow("SELECT COUNT(*) FROM schema_migrations WHERE version = ?", version).Scan(&count)
+		if err != nil {
+			return fmt.Errorf("failed to check migration version %s: %w", version, err)
+		}
+		if count > 0 {
+			continue
+		}
+
+		content, err := migrationsSqliteFS.ReadFile("sqlite/" + file)
+		if err != nil {
+			return fmt.Errorf("failed to read migration file %s: %w", file, err)
+		}
+
+		statements := strings.Split(string(content), ";")
+		for _, stmt := range statements {
+			stmt = strings.TrimSpace(stmt)
+			if stmt == "" {
+				continue
+			}
+			if _, err := db.Exec(stmt); err != nil {
+				return fmt.Errorf("failed to execute migration %s: %w", file, err)
+			}
+		}
+
+		if _, err := db.Exec("INSERT INTO schema_migrations (version) VALUES (?)", version); err != nil {
+			return fmt.Errorf("failed to record migration version %s: %w", version, err)
+		}
+	}
+
+	return nil
+}
+
+func runMigrationsEmbeddedClickhouse(chDB *sql.DB) error {
+	_, err := chDB.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations_ch (
+		version String,
+		applied_at DateTime DEFAULT now()
+	) ENGINE = MergeTree() ORDER BY version`)
+	if err != nil {
+		return fmt.Errorf("failed to create schema_migrations_ch table: %w", err)
+	}
+
+	entries, err := migrationsChFS.ReadDir("ch")
+	if err != nil {
+		return fmt.Errorf("failed to read ch migrations dir: %w", err)
+	}
+
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".up.sql") {
+			files = append(files, e.Name())
+		}
+	}
+	sort.Strings(files)
+
+	for _, file := range files {
+		version := strings.TrimSuffix(file, ".up.sql")
+
+		rows, err := chDB.Query("SELECT count() FROM schema_migrations_ch WHERE version = ?", version)
+		if err != nil {
+			return fmt.Errorf("failed to check migration version %s: %w", version, err)
+		}
+		var count int
+		if rows.Next() {
+			if err := rows.Scan(&count); err != nil {
+				rows.Close()
+				return fmt.Errorf("failed to scan migration count for %s: %w", version, err)
+			}
+		}
+		rows.Close()
+		if count > 0 {
+			continue
+		}
+
+		content, err := migrationsChFS.ReadFile("ch/" + file)
+		if err != nil {
+			return fmt.Errorf("failed to read migration file %s: %w", file, err)
+		}
+
+		stmt := strings.TrimSpace(string(content))
+		if stmt == "" {
+			continue
+		}
+		if _, err := chDB.Exec(stmt); err != nil {
+			return fmt.Errorf("failed to execute migration %s: %w", file, err)
+		}
+
+		if _, err := chDB.Exec("INSERT INTO schema_migrations_ch (version) VALUES (?)", version); err != nil {
+			return fmt.Errorf("failed to record migration version %s: %w", version, err)
+		}
+	}
+
+	return nil
+}
+
+func Run(dbType string) error {
+	cfg := config.Config
+
+	// Run ClickHouse migrations
+	if cfg.ClickhouseType == "embedded" {
+		if err := runMigrationsEmbeddedClickhouse(chdb.EmbeddedDB); err != nil {
+			return fmt.Errorf("embedded clickhouse migrations failed: %w", err)
+		}
+	} else {
+		tlsConfig := "&secure=true"
+		if cfg.ClickhouseTLS == "false" {
+			tlsConfig = ""
+		}
+
+		err := runMigrationsClickhouse(fmt.Sprintf(`clickhouse://%s?username=%s&password=%s&database=%s%s`, cfg.ClickhouseServer, url.QueryEscape(cfg.ClickhouseUsername), url.QueryEscape(cfg.ClickhousePassword), cfg.ClickhouseDatabase, tlsConfig))
+		if err != nil {
+			return fmt.Errorf("clickhouse migrations failed: %w", err)
+		}
+	}
+
+	if dbType == "sqlite" {
+		if err := runMigrationsSQLite(db.DB); err != nil {
+			return fmt.Errorf("sqlite migrations failed: %w", err)
+		}
+
+		return nil
 	}
 
 	// Run PostgreSQL migrations
-	pgHost := os.Getenv("POSTGRES_HOST")
-	pgPort := os.Getenv("POSTGRES_PORT")
-	pgDatabase := os.Getenv("POSTGRES_DATABASE")
-	pgUsername := os.Getenv("POSTGRES_USERNAME")
-	pgPassword := os.Getenv("POSTGRES_PASSWORD")
-	pgSSLMode := os.Getenv("POSTGRES_SSLMODE")
+	pgPort := cfg.PostgresPort
+	pgSSLMode := cfg.PostgresSSLMode
 
 	if pgSSLMode == "" {
 		pgSSLMode = "disable"
@@ -158,7 +292,7 @@ func Run() error {
 	}
 
 	pgConnStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		url.QueryEscape(pgUsername), url.QueryEscape(pgPassword), pgHost, pgPort, pgDatabase, pgSSLMode)
+		url.QueryEscape(cfg.PostgresUsername), url.QueryEscape(cfg.PostgresPassword), cfg.PostgresHost, pgPort, cfg.PostgresDatabase, pgSSLMode)
 
 	if err := runMigrationsPostgres(pgConnStr); err != nil {
 		return fmt.Errorf("postgres migrations failed: %w", err)

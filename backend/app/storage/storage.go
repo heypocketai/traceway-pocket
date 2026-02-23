@@ -1,9 +1,9 @@
 package storage
 
 import (
+	"github.com/tracewayapp/traceway/backend/app/config"
 	"context"
 	"fmt"
-	"os"
 )
 
 type Storage interface {
@@ -14,14 +14,16 @@ type Storage interface {
 var Store Storage
 
 func Init() error {
-	storageType := os.Getenv("STORAGE_TYPE")
+	cfg := config.Config
+
+	storageType := cfg.StorageType
 	if storageType == "" {
 		storageType = "local"
 	}
 
 	switch storageType {
 	case "local":
-		path := os.Getenv("STORAGE_PATH")
+		path := cfg.StoragePath
 		if path == "" {
 			path = "./storage"
 		}
@@ -31,15 +33,15 @@ func Init() error {
 		}
 		Store = s
 	case "s3":
-		bucket := os.Getenv("S3_BUCKET")
+		bucket := cfg.S3Bucket
 		if bucket == "" {
 			return fmt.Errorf("S3_BUCKET is required when STORAGE_TYPE=s3")
 		}
-		region := os.Getenv("S3_REGION")
+		region := cfg.S3Region
 		if region == "" {
 			return fmt.Errorf("S3_REGION is required when STORAGE_TYPE=s3")
 		}
-		s, err := NewS3Storage(bucket, region, os.Getenv("S3_ACCESS_KEY"), os.Getenv("S3_SECRET_KEY"), os.Getenv("S3_ENDPOINT"))
+		s, err := NewS3Storage(bucket, region, cfg.S3AccessKey, cfg.S3SecretKey, cfg.S3Endpoint)
 		if err != nil {
 			return fmt.Errorf("failed to create S3 storage: %w", err)
 		}

@@ -1,9 +1,9 @@
 package services
 
 import (
-	"backend/app/cache"
-	"backend/app/models"
-	"backend/app/storage"
+	"github.com/tracewayapp/traceway/backend/app/cache"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/storage"
 	"context"
 	"fmt"
 	"path/filepath"

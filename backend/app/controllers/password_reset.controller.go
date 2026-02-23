@@ -1,11 +1,11 @@
 package controllers
 
 import (
-	"backend/app/middleware"
-	"backend/app/models"
-	"backend/app/pgdb"
-	"backend/app/repositories"
-	"backend/app/services"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/services"
 	"database/sql"
 	"net/http"
 	"time"
@@ -62,7 +62,7 @@ func (c *passwordResetController) ForgotPassword(ctx *gin.Context) {
 func (c *passwordResetController) ValidateToken(ctx *gin.Context) {
 	token := ctx.Param("token")
 
-	user, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (*models.User, error) {
+	user, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.User, error) {
 		return repositories.UserRepository.FindByPasswordResetToken(tx, token)
 	})
 

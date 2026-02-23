@@ -1,7 +1,7 @@
 package models
 
 import (
-	"os"
+	"github.com/tracewayapp/traceway/backend/app/config"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +22,7 @@ func (p Project) ToProjectWithBackendUrl() *ProjectWithBackendUrl {
 }
 
 func getBackendUrl() string {
-	if url := os.Getenv("APP_BASE_URL"); url != "" {
+	if url := config.Config.AppBaseURL; url != "" {
 		return url
 	}
 	return "https://cloud.tracewayapp.com"

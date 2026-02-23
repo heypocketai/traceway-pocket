@@ -1,8 +1,8 @@
 package controllers
 
 import (
-	"backend/app/models"
-	"backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"net/http"
 	"time"
 

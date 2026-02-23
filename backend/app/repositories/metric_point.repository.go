@@ -1,8 +1,8 @@
 package repositories
 
 import (
-	"backend/app/chdb"
-	"backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/chdb"
+	"github.com/tracewayapp/traceway/backend/app/models"
 	"context"
 	"time"
 
@@ -13,7 +13,7 @@ import (
 type metricPointRepository struct{}
 
 func (r *metricPointRepository) InsertAsync(ctx context.Context, points []models.MetricPoint) error {
-	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO metric_points (project_id, name, value, tags, recorded_at)")
+	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO metric_points (project_id, name, value, tags, recorded_at)")
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (r *metricPointRepository) QueryTimeSeries(ctx context.Context, projectId u
 	}
 	query += " ORDER BY bucket ASC"
 
-	rows, err := (*chdb.Conn).Query(ctx, query, args...)
+	rows, err := chdb.Conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (r *metricPointRepository) DiscoverMetrics(ctx context.Context, projectId u
 		GROUP BY name
 		ORDER BY name ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, from, to)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (r *metricPointRepository) DiscoverTagValues(ctx context.Context, projectId
 		AND tags[?] != ''
 		ORDER BY tag_value ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, tagKey, projectId, metricName, from, to, tagKey)
+	rows, err := chdb.Conn.Query(ctx, query, tagKey, projectId, metricName, from, to, tagKey)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +186,7 @@ func (r *metricPointRepository) GetAverageBetween(ctx context.Context, projectId
 		query = "SELECT coalesce(sumMerge(sum_val) / countMerge(count_val), 0) FROM " + table + " WHERE project_id = ? AND name = ? AND recorded_at >= ? AND recorded_at <= ?"
 	}
 	var avg float64
-	err := (*chdb.Conn).QueryRow(ctx, query, projectId, name, start, end).Scan(&avg)
+	err := chdb.Conn.QueryRow(ctx, query, projectId, name, start, end).Scan(&avg)
 	return avg, err
 }
 
@@ -197,7 +197,7 @@ func (r *metricPointRepository) GetDistinctServers(ctx context.Context, projectI
 		AND tags['server_name'] != ''
 		ORDER BY sn ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, start, end)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, start, end)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (r *metricPointRepository) GetAverageByIntervalPerServer(ctx context.Contex
 
 	query += " GROUP BY bucket, sn ORDER BY bucket ASC, sn ASC"
 
-	rows, err := (*chdb.Conn).Query(ctx, query, args...)
+	rows, err := chdb.Conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

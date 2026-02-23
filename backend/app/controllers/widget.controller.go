@@ -1,9 +1,9 @@
 package controllers
 
 import (
-	"backend/app/middleware"
-	"backend/app/models"
-	"backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"encoding/json"
 	"net/http"
 	"sort"

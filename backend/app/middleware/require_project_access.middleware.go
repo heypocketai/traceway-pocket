@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"backend/app/pgdb"
-	"backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"database/sql"
 	"net/http"
 
@@ -30,7 +30,7 @@ func InitRequireProjectAccess() {
 			return
 		}
 
-		hasAccess, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (bool, error) {
+		hasAccess, err := db.ExecuteTransaction(func(tx *sql.Tx) (bool, error) {
 			return repositories.ProjectRepository.UserHasAccess(tx, projectId, userId)
 		})
 

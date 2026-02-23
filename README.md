@@ -32,6 +32,16 @@ docker compose up --build
 
 See the [docs](https://docs.tracewayapp.com) for all deployment options and configuration.
 
+## Embedded Mode
+
+Run Traceway inside your Go process with zero infrastructure — no Docker, no external databases:
+
+1. Install `libchdb`: `curl -sL https://lib.chdb.io | bash`
+2. Add the server module: `go get github.com/tracewayapp/traceway/backend`
+3. Call `tracewaybackend.Run()` in your app startup
+
+See the [embedded mode docs](https://docs.tracewayapp.com/learn/embedded-mode) for full setup.
+
 ## Documentation
 
 Full documentation is available at **[docs.tracewayapp.com](https://docs.tracewayapp.com)**:

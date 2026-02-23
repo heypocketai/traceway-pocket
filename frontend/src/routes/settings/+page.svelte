@@ -6,6 +6,7 @@
     import OrganizationTab from './organization-tab.svelte';
     import UsersTab from './users-tab.svelte';
     import type { Component } from 'svelte';
+    import { LoadingCircle } from '$lib/components/ui/loading-circle';
 
     let loading = $state(true);
     let error = $state<string | null>(null);
@@ -60,7 +61,7 @@
 
     {#if loading}
         <div class="flex items-center justify-center py-12">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <LoadingCircle size="xlg" />
         </div>
     {:else if error}
         <div class="text-center py-12 text-destructive">

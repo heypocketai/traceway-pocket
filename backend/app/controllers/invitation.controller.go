@@ -1,11 +1,11 @@
 package controllers
 
 import (
-	"backend/app/middleware"
-	"backend/app/models"
-	"backend/app/pgdb"
-	"backend/app/repositories"
-	"backend/app/services"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/services"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -96,7 +96,7 @@ func (c *invitationController) InviteUser(ctx *gin.Context) {
 func (c *invitationController) ListInvitations(ctx *gin.Context) {
 	organizationId := middleware.GetOrganizationId(ctx)
 
-	invitations, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) ([]*models.InvitationWithInviter, error) {
+	invitations, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.InvitationWithInviter, error) {
 		return repositories.InvitationRepository.FindByOrganization(tx, organizationId)
 	})
 
@@ -151,7 +151,7 @@ func (c *invitationController) GetInvitationInfo(ctx *gin.Context) {
 		UserExists bool
 	}
 
-	data, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (*invitationInfo, error) {
+	data, err := db.ExecuteTransaction(func(tx *sql.Tx) (*invitationInfo, error) {
 		invitation, err := repositories.InvitationRepository.FindByToken(tx, token)
 		if err != nil {
 			return nil, err

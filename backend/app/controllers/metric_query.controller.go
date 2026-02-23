@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"backend/app/middleware"
-	"backend/app/models"
-	"backend/app/pgdb"
-	"backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -112,7 +112,7 @@ func (c *metricQueryController) Discover(ctx *gin.Context) {
 		return
 	}
 
-	registry, regErr := pgdb.ExecuteTransaction(func(tx *sql.Tx) ([]*models.MetricRegistry, error) {
+	registry, regErr := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.MetricRegistry, error) {
 		return repositories.MetricRegistryRepository.FindByProject(tx, projectId)
 	})
 
@@ -184,7 +184,7 @@ func (c *metricQueryController) UpdateRegistry(ctx *gin.Context) {
 		return
 	}
 
-	updated, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (*models.MetricRegistry, error) {
+	updated, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.MetricRegistry, error) {
 		entry, err := repositories.MetricRegistryRepository.FindByProjectAndName(tx, projectId, req.Name)
 		if err != nil {
 			return nil, err

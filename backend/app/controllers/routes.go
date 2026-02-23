@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"backend/app/controllers/clientcontrollers"
-	"backend/app/controllers/otelcontrollers"
-	"backend/app/middleware"
-	"os"
+	"github.com/tracewayapp/traceway/backend/app/config"
+	"github.com/tracewayapp/traceway/backend/app/controllers/clientcontrollers"
+	"github.com/tracewayapp/traceway/backend/app/controllers/otelcontrollers"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -96,7 +96,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.POST("/login", middleware.Transactional, AuthController.Login)
 	router.POST("/register", middleware.Transactional, AuthController.Register)
 
-	if os.Getenv("CLOUD_MODE") != "true" {
+	if config.Config.CloudMode != "true" {
 		router.GET("/has-organizations", middleware.Transactional, AuthController.HasOrganizations)
 	}
 

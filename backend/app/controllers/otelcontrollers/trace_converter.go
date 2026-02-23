@@ -1,8 +1,8 @@
 package otelcontrollers
 
 import (
-	"backend/app/controllers/clientcontrollers"
-	"backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/controllers/clientcontrollers"
+	"github.com/tracewayapp/traceway/backend/app/models"
 	"fmt"
 	"strings"
 	"time"

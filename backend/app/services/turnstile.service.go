@@ -1,11 +1,11 @@
 package services
 
 import (
+	"github.com/tracewayapp/traceway/backend/app/config"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/url"
-	"os"
 	"time"
 )
 
@@ -21,9 +21,13 @@ type turnstileResponse struct {
 	Hostname    string   `json:"hostname"`
 }
 
-var TurnstileService = &turnstileService{
-	secretKey: os.Getenv("TURNSTILE_SECRET_KEY"),
-	client:    &http.Client{Timeout: 10 * time.Second},
+var TurnstileService *turnstileService
+
+func InitTurnstile() {
+	TurnstileService = &turnstileService{
+		secretKey: config.Config.TurnstileSecretKey,
+		client:    &http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 func (s *turnstileService) IsEnabled() bool {

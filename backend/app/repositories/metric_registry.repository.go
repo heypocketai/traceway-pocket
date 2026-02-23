@@ -1,13 +1,14 @@
 package repositories
 
 import (
-	"backend/app/models"
 	"database/sql"
 	"sync"
 	"time"
 
+	"github.com/tracewayapp/traceway/backend/app/models"
+
 	"github.com/google/uuid"
-	"github.com/tracewayapp/lit"
+	"github.com/tracewayapp/lit/v2"
 )
 
 type metricRegistryRepository struct {
@@ -46,23 +47,23 @@ func (r *metricRegistryRepository) EnsureRegistered(tx *sql.Tx, projectId uuid.U
 }
 
 func (r *metricRegistryRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.MetricRegistry, error) {
-	return lit.Select[models.MetricRegistry](
+	return lit.SelectNamed[models.MetricRegistry](
 		tx,
-		"SELECT id, project_id, name, metric_type, unit, description, created_at FROM metric_registry WHERE project_id = $1 ORDER BY name ASC",
-		projectId,
+		"SELECT id, project_id, name, metric_type, unit, description, created_at FROM metric_registry WHERE project_id = :project_id ORDER BY name ASC",
+		lit.P{"project_id": projectId},
 	)
 }
 
 func (r *metricRegistryRepository) FindByProjectAndName(tx *sql.Tx, projectId uuid.UUID, name string) (*models.MetricRegistry, error) {
-	return lit.SelectSingle[models.MetricRegistry](
+	return lit.SelectSingleNamed[models.MetricRegistry](
 		tx,
-		"SELECT id, project_id, name, metric_type, unit, description, created_at FROM metric_registry WHERE project_id = $1 AND name = $2",
-		projectId, name,
+		"SELECT id, project_id, name, metric_type, unit, description, created_at FROM metric_registry WHERE project_id = :project_id AND name = :name",
+		lit.P{"project_id": projectId, "name": name},
 	)
 }
 
 func (r *metricRegistryRepository) Update(tx *sql.Tx, entry *models.MetricRegistry) error {
-	return lit.Update(tx, entry, "id = $1", entry.Id)
+	return lit.UpdateNamed(tx, entry, "id = :id", lit.P{"id": entry.Id})
 }
 
 func defaultMetricType(name string) string {

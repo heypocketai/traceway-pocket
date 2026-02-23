@@ -23,7 +23,7 @@ function stubBillingImports(): Plugin {
 		},
 		load(id) {
 			if (id === '\0virtual:billing-stub') {
-				return 'export default {}';
+				return 'export default null';
 			}
 		}
 	};

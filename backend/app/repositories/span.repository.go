@@ -1,8 +1,8 @@
 package repositories
 
 import (
-	"backend/app/chdb"
-	"backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/chdb"
+	"github.com/tracewayapp/traceway/backend/app/models"
 	"context"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -16,7 +16,7 @@ func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) e
 		return nil
 	}
 
-	batch, err := (*chdb.Conn).PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
+	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
 		"INSERT INTO spans (id, trace_id, project_id, name, start_time, duration, recorded_at)")
 	if err != nil {
 		return err
@@ -46,7 +46,7 @@ func (r *spanRepository) FindByTraceId(ctx context.Context, projectId, traceId u
 	WHERE project_id = ? AND trace_id = ?
 	ORDER BY start_time ASC`
 
-	rows, err := (*chdb.Conn).Query(ctx, query, projectId, traceId)
+	rows, err := chdb.Conn.Query(ctx, query, projectId, traceId)
 	if err != nil {
 		return nil, err
 	}

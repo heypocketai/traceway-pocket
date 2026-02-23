@@ -69,6 +69,11 @@ rm -rf "$ROOT_DIR/backend/static/dist"
 mkdir -p "$ROOT_DIR/backend/static/dist"
 cp -r "$ROOT_DIR/frontend/build/"* "$ROOT_DIR/backend/static/dist/"
 
+rm -rf "$ROOT_DIR/backend/static/frontend"
+mkdir -p "$ROOT_DIR/backend/static/frontend"
+cp -r "$ROOT_DIR/frontend/build/"* "$ROOT_DIR/backend/static/frontend/"
+echo "Committed frontend copy updated in backend/static/frontend/"
+
 if [ -n "$SOURCEMAP_TOKEN_INPUT" ]; then
     APP_VERSION=${NEW_VERSION:-$CURRENT_VERSION}
     echo "Uploading sourcemaps for version $APP_VERSION..."

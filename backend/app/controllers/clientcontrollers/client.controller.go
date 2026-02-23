@@ -1,14 +1,14 @@
 package clientcontrollers
 
 import (
-	"backend/app/hooks"
-	"backend/app/middleware"
-	"backend/app/models"
-	"backend/app/models/clientmodels"
-	"backend/app/pgdb"
-	"backend/app/repositories"
-	"backend/app/services"
-	"backend/app/storage"
+	"github.com/tracewayapp/traceway/backend/app/hooks"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/models/clientmodels"
+	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/services"
+	"github.com/tracewayapp/traceway/backend/app/storage"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -103,7 +103,7 @@ func (e clientController) Report(c *gin.Context) {
 
 		var sourceMaps *[]*models.SourceMap
 		if project != nil && isJsFramework(project.Framework) {
-			sourceMapsLoaded, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) ([]*models.SourceMap, error) {
+			sourceMapsLoaded, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.SourceMap, error) {
 				if request.AppVersion != "" {
 					return repositories.SourceMapRepository.FindByProjectAndVersion(tx, projectId, request.AppVersion)
 				}
@@ -244,7 +244,7 @@ func collectUniqueMetricNames(points []models.MetricPoint) []string {
 }
 
 func autoRegisterMetrics(projectId uuid.UUID, names []string) {
-	_, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (struct{}, error) {
+	_, err := db.ExecuteTransaction(func(tx *sql.Tx) (struct{}, error) {
 		return struct{}{}, repositories.MetricRegistryRepository.EnsureRegistered(tx, projectId, names)
 	})
 	if err != nil {

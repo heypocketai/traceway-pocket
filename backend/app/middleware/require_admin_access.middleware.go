@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"backend/app/pgdb"
-	"backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -31,7 +31,7 @@ func InitRequireAdminAccess() {
 			return
 		}
 
-		role, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
+		role, err := db.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
 			return repositories.OrganizationRepository.GetUserRole(tx, organizationId, userId)
 		})
 

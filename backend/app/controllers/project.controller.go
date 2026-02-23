@@ -1,11 +1,11 @@
 package controllers
 
 import (
-	"backend/app/cache"
-	"backend/app/middleware"
-	"backend/app/models"
-	"backend/app/pgdb"
-	"backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/cache"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -50,7 +50,7 @@ type CreateProjectRequest struct {
 func (p projectController) ListProjects(c *gin.Context) {
 	userId := middleware.GetUserId(c)
 
-	projectsWithBackendUrl, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) ([]*models.ProjectWithBackendUrl, error) {
+	projectsWithBackendUrl, err := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.ProjectWithBackendUrl, error) {
 		return repositories.ProjectRepository.FindAllWithBackendUrlByUserId(tx, userId)
 	})
 	if err != nil {
@@ -92,7 +92,7 @@ func (p projectController) CreateProject(c *gin.Context) {
 		return
 	}
 
-	project, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
+	project, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
 		currentProject, err := repositories.ProjectRepository.FindById(tx, projectId)
 		if err != nil {
 			return nil, err
@@ -119,7 +119,7 @@ func (p projectController) GenerateSourceMapToken(c *gin.Context) {
 		return
 	}
 
-	token, err := pgdb.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
+	token, err := db.ExecuteTransaction(func(tx *sql.Tx) (string, error) {
 		return repositories.ProjectRepository.GenerateSourceMapToken(tx, projectId)
 	})
 	if err != nil {

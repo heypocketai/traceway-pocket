@@ -1,9 +1,9 @@
 package services
 
 import (
+	"github.com/tracewayapp/traceway/backend/app/config"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -18,7 +18,7 @@ type JWTClaims struct {
 }
 
 func InitJWT() error {
-	secret := os.Getenv("JWT_SECRET")
+	secret := config.Config.JWTSecret
 	if secret == "" {
 		return errors.New("JWT_SECRET environment variable is not set")
 	}

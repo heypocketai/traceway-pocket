@@ -1,10 +1,10 @@
 package services
 
 import (
+	"github.com/tracewayapp/traceway/backend/app/config"
 	"fmt"
 	"log"
 	"net/smtp"
-	"os"
 	"strconv"
 )
 
@@ -21,24 +21,26 @@ type emailService struct {
 var EmailService *emailService
 
 func InitEmail() {
-	enabled := os.Getenv("SMTP_ENABLED") == "true"
-	port, _ := strconv.Atoi(os.Getenv("SMTP_PORT"))
+	cfg := config.Config
+
+	enabled := cfg.SMTPEnabled == "true"
+	port, _ := strconv.Atoi(cfg.SMTPPort)
 	if port == 0 {
 		port = 587
 	}
 
-	baseUrl := os.Getenv("APP_BASE_URL")
+	baseUrl := cfg.AppBaseURL
 	if baseUrl == "" {
 		baseUrl = "http://localhost:5173"
 	}
 
 	EmailService = &emailService{
 		enabled:  enabled,
-		host:     os.Getenv("SMTP_HOST"),
+		host:     cfg.SMTPHost,
 		port:     port,
-		username: os.Getenv("SMTP_USERNAME"),
-		password: os.Getenv("SMTP_PASSWORD"),
-		from:     os.Getenv("SMTP_FROM"),
+		username: cfg.SMTPUsername,
+		password: cfg.SMTPPassword,
+		from:     cfg.SMTPFrom,
 		baseUrl:  baseUrl,
 	}
 

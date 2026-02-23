@@ -1,14 +1,14 @@
 package controllers
 
 import (
-	"backend/app/cache"
-	"backend/app/middleware"
-	"backend/app/models"
-	"backend/app/repositories"
-	"backend/app/services"
+	"github.com/tracewayapp/traceway/backend/app/cache"
+	"github.com/tracewayapp/traceway/backend/app/config"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/services"
 	"database/sql"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	traceway "go.tracewayapp.com"
@@ -97,7 +97,7 @@ func (a authController) Register(c *gin.Context) {
 	tx := middleware.GetTx(c)
 
 	// if we're not in the cloud mode only a single organization is allowed
-	if os.Getenv("CLOUD_MODE") != "true" {
+	if config.Config.CloudMode != "true" {
 		hasOrganizations, err := repositories.OrganizationRepository.HasOrganizations(tx)
 
 		if err != nil {

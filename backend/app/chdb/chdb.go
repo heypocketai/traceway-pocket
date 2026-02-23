@@ -1,9 +1,11 @@
 package chdb
 
 import (
+	"github.com/tracewayapp/traceway/backend/app/config"
+	"context"
 	"crypto/tls"
+	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -11,17 +13,32 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 )
 
-var Conn *driver.Conn
+type ChConn interface {
+	Query(ctx context.Context, query string, args ...any) (driver.Rows, error)
+	QueryRow(ctx context.Context, query string, args ...any) driver.Row
+	PrepareBatch(ctx context.Context, query string, opts ...driver.PrepareBatchOption) (driver.Batch, error)
+	Exec(ctx context.Context, query string, args ...any) error
+}
 
-// Init initializes the Clickhouse connection pool
+var Conn ChConn
+var EmbeddedDB *sql.DB
+
 func Init() error {
+	if config.Config.ClickhouseType == "embedded" {
+		return initEmbedded()
+	}
+	return initExternal()
+}
+
+func initExternal() error {
+	cfg := config.Config
 	tlsConfig := &tls.Config{}
 
-	clickhouseServer := os.Getenv("CLICKHOUSE_SERVER")
-	clickhouseDatabase := os.Getenv("CLICKHOUSE_DATABASE")
-	clickhouseUsername := os.Getenv("CLICKHOUSE_USERNAME")
-	clickhousePassword := os.Getenv("CLICKHOUSE_PASSWORD")
-	clickhouseTls := os.Getenv("CLICKHOUSE_TLS")
+	clickhouseServer := cfg.ClickhouseServer
+	clickhouseDatabase := cfg.ClickhouseDatabase
+	clickhouseUsername := cfg.ClickhouseUsername
+	clickhousePassword := cfg.ClickhousePassword
+	clickhouseTls := cfg.ClickhouseTLS
 
 	if clickhouseTls == "false" {
 		tlsConfig = nil
@@ -61,7 +78,7 @@ func Init() error {
 		return err
 	}
 
-	Conn = &conn
+	Conn = conn
 
 	return nil
 }

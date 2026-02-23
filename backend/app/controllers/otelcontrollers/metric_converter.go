@@ -1,7 +1,7 @@
 package otelcontrollers
 
 import (
-	"backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/models"
 
 	"github.com/google/uuid"
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"

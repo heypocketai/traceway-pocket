@@ -1,10 +1,10 @@
 package otelcontrollers
 
 import (
-	"backend/app/hooks"
-	"backend/app/middleware"
-	"backend/app/models"
-	"backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/hooks"
+	"github.com/tracewayapp/traceway/backend/app/middleware"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
