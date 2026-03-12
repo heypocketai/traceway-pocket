@@ -99,9 +99,31 @@ class TestController
             'operation' => $operations[array_rand($operations)],
         ]);
 
+        $hosts = ['web-01', 'web-02', 'web-03'];
+        $cpuUsage = 10.0 + (random_int(0, 8500) / 100.0);
+
+        $cpuGauge = $meter->createObservableGauge('app.cpu_usage', '%', 'CPU usage percentage');
+        $cpuGauge->observe(function ($observer) use ($cpuUsage, $hosts) {
+            $observer->observe($cpuUsage, [
+                'host' => $hosts[array_rand($hosts)],
+            ]);
+        });
+
+        $methods = ['GET', 'POST'];
+        $statuses = ['200', '404', '500'];
+        $requestCount = random_int(1, 50);
+
+        $counter = $meter->createCounter('app.requests_total', 'requests', 'Total HTTP requests');
+        $counter->add($requestCount, [
+            'method' => $methods[array_rand($methods)],
+            'status' => $statuses[array_rand($statuses)],
+        ]);
+
         return new JsonResponse([
             'queue_size' => $queueSize,
             'cache_latency_ms' => $latency,
+            'cpu_usage' => $cpuUsage,
+            'requests_total' => $requestCount,
         ]);
     }
 

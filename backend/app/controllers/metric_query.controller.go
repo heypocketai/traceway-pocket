@@ -35,7 +35,8 @@ type MetricQueryResponse struct {
 }
 
 type MetricQueryResult struct {
-	Name   string                           `json:"name"`
+	Name   string                              `json:"name"`
+	Unit   string                              `json:"unit"`
 	Series map[string][]models.TimeSeriesPoint `json:"series"`
 }
 
@@ -56,6 +57,19 @@ func (c *metricQueryController) Query(ctx *gin.Context) {
 		req.IntervalMinutes = calculateIntervalMinutes(req.To.Sub(req.From))
 	}
 
+	unitMap := make(map[string]string)
+	registry, regErr := db.ExecuteTransaction(func(tx *sql.Tx) ([]*models.MetricRegistry, error) {
+		return repositories.MetricRegistryRepository.FindByProject(tx, projectId)
+	})
+	if regErr != nil {
+		traceway.CaptureException(fmt.Errorf("failed to load metric registry for query: %w", regErr))
+	}
+	if regErr == nil {
+		for _, r := range registry {
+			unitMap[r.Name] = r.Unit
+		}
+	}
+
 	var results []MetricQueryResult
 	for _, q := range req.Queries {
 		agg := q.Aggregation
@@ -72,8 +86,14 @@ func (c *metricQueryController) Query(ctx *gin.Context) {
 			return
 		}
 
+		resultUnit := unitMap[q.Name]
+		if agg == "count" {
+			resultUnit = "count"
+		}
+
 		results = append(results, MetricQueryResult{
 			Name:   q.Name,
+			Unit:   resultUnit,
 			Series: series,
 		})
 	}

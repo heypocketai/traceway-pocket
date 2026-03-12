@@ -11,7 +11,7 @@
 		data = [],
 		height = 220,
 		padding = { top: 10, right: 70, bottom: 10, left: 160 },
-		unit = 'ms',
+		unit = '',
 		formatValue
 	} = $props<{
 		data: BarData[];

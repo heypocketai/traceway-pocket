@@ -36,6 +36,8 @@
 
 	let title = $state(widget?.title ?? '');
 	let widgetType = $state(widget?.widgetType ?? 'line_chart');
+	let unit = $state(widget?.config?.unit ?? '');
+	let unitManuallySet = $state(!!widget?.config?.unit);
 	let sources = $state<WidgetSource[]>(
 		widget?.config?.sources ?? [{ type: 'metric', name: '', aggregation: 'avg' }]
 	);
@@ -44,6 +46,8 @@
 		if (open) {
 			title = widget?.title ?? '';
 			widgetType = widget?.widgetType ?? 'line_chart';
+			unit = widget?.config?.unit ?? '';
+			unitManuallySet = !!widget?.config?.unit;
 			sources = widget?.config?.sources
 				? [...widget.config.sources]
 				: [{ type: 'metric', name: '', aggregation: 'avg' }];
@@ -53,6 +57,11 @@
 	function getMetricTagKeys(metricName: string): string[] {
 		const m = availableMetrics.find((m: DiscoveredMetric) => m.name === metricName);
 		return m?.tagKeys ?? [];
+	}
+
+	function getMetricUnit(metricName: string): string {
+		const m = availableMetrics.find((m: DiscoveredMetric) => m.name === metricName);
+		return m?.unit ?? '';
 	}
 
 	async function loadTagValues(metricName: string, key: string): Promise<string[]> {
@@ -67,10 +76,18 @@
 		}
 	}
 
+	function handleMetricChange(index: number, value: string) {
+		sources[index].name = value;
+		if (!unitManuallySet) {
+			unit = getMetricUnit(value);
+		}
+	}
+
 	function handleSave() {
 		const validSources = sources.filter((s: WidgetSource) => s.name);
 		const displayTitle = title.trim() || validSources[0]?.name || '';
 		const config: Record<string, any> = { sources: validSources };
+		if (unit) config.unit = unit;
 		onSave({
 			title: displayTitle,
 			widgetType,
@@ -124,6 +141,17 @@
 				</Select.Root>
 			</div>
 
+			<div>
+				<label class="text-sm font-medium" for="widget-unit">Unit (optional)</label>
+				<Input
+					id="widget-unit"
+					bind:value={unit}
+					placeholder="Auto-detected from metric"
+					oninput={() => { unitManuallySet = unit.length > 0; }}
+				/>
+				<p class="text-xs text-muted-foreground mt-1">%, ms, s, MB, GB, bytes, count, ns</p>
+			</div>
+
 			{#each sources as source, i}
 				<div class="space-y-2 rounded-md border p-3">
 					<div class="flex items-center gap-2">
@@ -131,7 +159,7 @@
 							type="single"
 							value={source.name}
 							onValueChange={(v) => {
-								if (v) sources[i].name = v;
+								if (v) handleMetricChange(i, v);
 							}}
 						>
 							<Select.Trigger class="flex-1">{source.name || 'Select metric'}</Select.Trigger>

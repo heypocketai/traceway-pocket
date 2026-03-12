@@ -66,7 +66,7 @@
 			<Card.Root class="h-full gap-0">
 				<Card.Header class="pr-2 pb-1">
 					<div class="flex items-center justify-between">
-						<Card.Title class="text-sm font-medium">{widget.title}</Card.Title>
+						<Card.Title class="text-sm font-medium">{widget.title}{#if widget.config?.unit}<span class="text-xs font-normal text-muted-foreground"> ({widget.config.unit})</span>{/if}</Card.Title>
 						<DropdownMenu.Root>
 							<DropdownMenu.Trigger
 								class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

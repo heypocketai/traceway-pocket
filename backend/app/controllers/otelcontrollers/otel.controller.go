@@ -5,6 +5,7 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
+	"github.com/tracewayapp/traceway/backend/app/services"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -99,11 +100,15 @@ func (o otelController) ExportMetrics(c *gin.Context) {
 		return
 	}
 
-	points := convertMetricPoints(projectId, req)
-	if len(points) > 0 {
-		if err := repositories.MetricPointRepository.InsertAsync(c, points); err != nil {
+	result := convertMetricPoints(projectId, req)
+	if len(result.Points) > 0 {
+		if err := repositories.MetricPointRepository.InsertAsync(c, result.Points); err != nil {
 			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting OTEL metric points: %w", err))
 			return
+		}
+
+		if len(result.Entries) > 0 {
+			go services.AutoRegisterMetricsWithUnits(projectId, result.Entries)
 		}
 	}
 

@@ -1,14 +1,16 @@
 <script lang="ts">
 	import * as Table from '$lib/components/ui/table';
 	import type { MetricTrendPoint } from '$lib/types/dashboard';
+	import { formatMetricLabel } from '$lib/utils/metric-format';
 
 	type SeriesItem = {
 		key: string;
 		data: MetricTrendPoint[];
 	};
 
-	let { series = [] } = $props<{
+	let { series = [], unit = '' } = $props<{
 		series: SeriesItem[];
+		unit?: string;
 	}>();
 
 	const stats = $derived(() => {
@@ -33,6 +35,7 @@
 	});
 
 	function fmt(v: number): string {
+		if (unit) return formatMetricLabel(v, unit);
 		if (Number.isInteger(v)) return v.toString();
 		return v.toFixed(2);
 	}

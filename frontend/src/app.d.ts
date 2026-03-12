@@ -13,6 +13,20 @@ declare global {
 	const __CLOUD_MODE__: string;
 	const __TURNSTILE_SITE_KEY__: string;
 	const __TRACEWAY_URL__: string;
+
+	interface Window {
+		turnstile: {
+			render: (element: HTMLElement, options: {
+				sitekey: string;
+				callback: (token: string) => void;
+				'error-callback'?: () => void;
+				'expired-callback'?: () => void;
+				theme?: 'light' | 'dark' | 'auto';
+			}) => string;
+			remove: (widgetId: string) => void;
+		};
+		onTurnstileLoad?: () => void;
+	}
 }
 
 export {};

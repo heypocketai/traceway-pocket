@@ -6,6 +6,7 @@
 	import { projectsState } from '$lib/state/projects.svelte';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import type { MetricTrendPoint, MetricQueryResponse } from '$lib/types/dashboard';
+	import { formatMetricLabel } from '$lib/utils/metric-format';
 
 	type WidgetSource = {
 		type: 'metric';
@@ -19,6 +20,7 @@
 		sources?: WidgetSource[];
 		yAxisLabel?: string;
 		showLegend?: boolean;
+		unit?: string;
 	};
 
 	let {
@@ -49,8 +51,11 @@
 	let series = $state<Array<{ key: string; data: MetricTrendPoint[]; color: string }>>([]);
 	let loading = $state(true);
 	let singleValue = $state<number | null>(null);
+	let resolvedUnit = $state('');
 
 	const colors = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+	const effectiveUnit = $derived(widget.config.unit ?? resolvedUnit);
 
 	async function loadData() {
 		const sources = widget.config.sources;
@@ -77,7 +82,9 @@
 				{ projectId: projectsState.currentProjectId ?? undefined }
 			);
 
+			const units = new Set<string>();
 			for (const result of response.results) {
+				if (result.unit) units.add(result.unit);
 				for (const [key, points] of Object.entries(result.series)) {
 					const label = Object.keys(result.series).length > 1 ? `${result.name} (${key})` : result.name;
 					newSeries.push({
@@ -92,6 +99,7 @@
 				}
 			}
 
+			resolvedUnit = units.size === 1 ? [...units][0] : '';
 			series = newSeries;
 
 			if (widget.widgetType === 'single_value' && newSeries.length > 0 && newSeries[0].data.length > 0) {
@@ -126,12 +134,12 @@
 	{:else if widget.widgetType === 'single_value'}
 		<div class="flex h-full flex-col items-center justify-center">
 			<span class="text-3xl font-bold">
-				{singleValue !== null ? (Number.isInteger(singleValue) ? singleValue : singleValue.toFixed(2)) : '-'}
+				{singleValue !== null ? formatMetricLabel(singleValue, effectiveUnit) : '-'}
 			</span>
 		</div>
 	{:else if widget.widgetType === 'bar_chart'}
 		{#if barData.length > 0}
-			<D3HorizontalBarChart data={barData} height={200} unit="" />
+			<D3HorizontalBarChart data={barData} height={200} unit={effectiveUnit} formatValue={(v) => formatMetricLabel(v, effectiveUnit)} />
 		{:else}
 			<div class="flex h-full items-center justify-center text-sm text-muted-foreground">
 				No data
@@ -139,7 +147,7 @@
 		{/if}
 	{:else if widget.widgetType === 'table'}
 		{#if series.length > 0}
-			<WidgetTable {series} />
+			<WidgetTable {series} unit={effectiveUnit} />
 		{:else}
 			<div class="flex h-full items-center justify-center text-sm text-muted-foreground">
 				No data
@@ -155,6 +163,8 @@
 				{onRangeSelect}
 				data={series[0]?.data ?? []}
 				areaFill={true}
+				unit={effectiveUnit}
+				formatValue={(v) => formatMetricLabel(v, effectiveUnit)}
 				{sharedHoverTime}
 				{isSourceChart}
 				{onHoverTimeChange}
@@ -172,6 +182,8 @@
 			padding={{ top: 10, right: 4, bottom: 20, left: 45 }}
 			{onRangeSelect}
 			data={series[0]?.data ?? []}
+			unit={effectiveUnit}
+			formatValue={(v) => formatMetricLabel(v, effectiveUnit)}
 			{sharedHoverTime}
 			{isSourceChart}
 			{onHoverTimeChange}

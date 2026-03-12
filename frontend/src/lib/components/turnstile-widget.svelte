@@ -13,22 +13,6 @@
     let container: HTMLDivElement;
     let widgetId: string | null = null;
 
-    declare global {
-        interface Window {
-            turnstile: {
-                render: (element: HTMLElement, options: {
-                    sitekey: string;
-                    callback: (token: string) => void;
-                    'error-callback'?: () => void;
-                    'expired-callback'?: () => void;
-                    theme?: 'light' | 'dark' | 'auto';
-                }) => string;
-                remove: (widgetId: string) => void;
-            };
-            onTurnstileLoad?: () => void;
-        }
-    }
-
     function loadScript(): Promise<void> {
         return new Promise((resolve) => {
             if (window.turnstile) {

@@ -4,6 +4,7 @@
 	import { min, max } from 'd3-array';
 	import { formatDateTime } from '$lib/utils/formatters';
 	import { getTimezone } from '$lib/state/timezone.svelte';
+	import { formatMetricValue } from '$lib/utils/metric-format';
 
 	type DataPoint = {
 		timestamp: Date;
@@ -124,8 +125,19 @@
 	// Generate Y axis ticks
 	const yTicks = $derived(() => yScale.ticks(4));
 
-	// Format Y axis label
+	const yAxisUnit = $derived(() => {
+		if (!unit) return '';
+		const ticks = yTicks();
+		if (ticks.length === 0) return unit;
+		const maxTick = ticks[ticks.length - 1];
+		return formatMetricValue(maxTick, unit).unit;
+	});
+
 	function formatYLabel(value: number): string {
+		if (unit) {
+			const result = formatMetricValue(value, unit);
+			return result.text;
+		}
 		if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
 		if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
 		if (Number.isInteger(value)) return value.toString();
@@ -462,6 +474,19 @@
 						{formatYLabel(tick)}
 					</text>
 				{/each}
+
+				<!-- Y axis unit label -->
+				{#if yAxisUnit()}
+					<text
+						x={-8}
+						y={-4}
+						text-anchor="end"
+						fill="#9ca3af"
+						font-size="10"
+					>
+						{yAxisUnit()}
+					</text>
+				{/if}
 
 				<!-- X axis line -->
 				<line

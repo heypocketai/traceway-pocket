@@ -179,8 +179,8 @@ func (e clientController) Report(c *gin.Context) {
 			return
 		}
 
-		metricNames := collectUniqueMetricNames(metricPointsToInsert)
-		go autoRegisterMetrics(projectId, metricNames)
+		metricNames := services.CollectUniqueMetricNames(metricPointsToInsert)
+		go services.AutoRegisterMetrics(projectId, metricNames)
 	}
 
 	err = repositories.SpanRepository.InsertAsync(c, spansToInsert)
@@ -229,27 +229,6 @@ func (e clientController) Report(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{})
-}
-
-func collectUniqueMetricNames(points []models.MetricPoint) []string {
-	seen := make(map[string]struct{}, len(points))
-	var names []string
-	for _, p := range points {
-		if _, ok := seen[p.Name]; !ok {
-			seen[p.Name] = struct{}{}
-			names = append(names, p.Name)
-		}
-	}
-	return names
-}
-
-func autoRegisterMetrics(projectId uuid.UUID, names []string) {
-	_, err := db.ExecuteTransaction(func(tx *sql.Tx) (struct{}, error) {
-		return struct{}{}, repositories.MetricRegistryRepository.EnsureRegistered(tx, projectId, names)
-	})
-	if err != nil {
-		traceway.CaptureException(fmt.Errorf("failed to auto-register metrics: %w", err))
-	}
 }
 
 var (

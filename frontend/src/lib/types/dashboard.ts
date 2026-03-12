@@ -80,6 +80,7 @@ export type TimeSeriesPoint = {
 
 export type MetricQueryResult = {
 	name: string;
+	unit: string;
 	series: Record<string, TimeSeriesPoint[]>;
 };
 

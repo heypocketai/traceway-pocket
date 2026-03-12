@@ -66,6 +66,49 @@ func (r *metricRegistryRepository) Update(tx *sql.Tx, entry *models.MetricRegist
 	return lit.UpdateNamed(tx, entry, "id = :id", lit.P{"id": entry.Id})
 }
 
+type MetricRegistrationEntry struct {
+	Name       string
+	Unit       string
+	MetricType string
+}
+
+func (r *metricRegistryRepository) EnsureRegisteredWithUnits(tx *sql.Tx, projectId uuid.UUID, entries []MetricRegistrationEntry) error {
+	for _, entry := range entries {
+		key := projectId.String() + ":" + entry.Name
+		if _, loaded := r.knownMetrics.Load(key); loaded {
+			continue
+		}
+
+		metricType := entry.MetricType
+		if metricType == "" {
+			metricType = defaultMetricType(entry.Name)
+		}
+		unit := entry.Unit
+		if unit == "" {
+			unit = defaultUnit(entry.Name)
+		}
+
+		rec := &models.MetricRegistry{
+			ProjectId:   projectId,
+			Name:        entry.Name,
+			MetricType:  metricType,
+			Unit:        unit,
+			Description: "",
+			CreatedAt:   time.Now().UTC(),
+		}
+
+		_, err := lit.Insert[models.MetricRegistry](tx, rec)
+		if err != nil {
+			existing, findErr := r.FindByProjectAndName(tx, projectId, entry.Name)
+			if findErr != nil || existing == nil {
+				return err
+			}
+		}
+		r.knownMetrics.Store(key, true)
+	}
+	return nil
+}
+
 func defaultMetricType(name string) string {
 	switch name {
 	case models.MetricNameNumGC:
