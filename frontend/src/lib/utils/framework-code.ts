@@ -29,7 +29,7 @@ export function getInstallCommand(framework: Framework): string {
 		case 'remix':
 			return 'npm install @tracewayapp/remix';
 		case 'symfony':
-			return 'composer require open-telemetry/sdk open-telemetry/exporter-otlp';
+			return 'composer require open-telemetry/sdk open-telemetry/exporter-otlp open-telemetry/opentelemetry-auto-symfony';
 		case 'cloudflare':
 			return '';
 		case 'opentelemetry':
@@ -207,14 +207,61 @@ export default withTraceway({
 });`;
 
 		case 'symfony':
-			return `# Add to your .env file
-OTEL_PHP_AUTOLOAD_ENABLED=true
-OTEL_SERVICE_NAME=my-symfony-app
-OTEL_TRACES_EXPORTER=otlp
-OTEL_METRICS_EXPORTER=otlp
-OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
-OTEL_EXPORTER_OTLP_ENDPOINT=${backendUrl}/api/otel
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ${token || 'YOUR_TOKEN'}`;
+			return `<?php
+// public/index.php
+
+use App\\Kernel;
+
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
+\\OpenTelemetry\\SDK\\SdkAutoloader::autoload();
+
+// Fixes for Symfony's OTel auto-instrumentation:
+// 1. Corrects http.route from internal route name to URL path template
+// 2. Cleans up sub-request scopes so 500 error spans are exported
+\\OpenTelemetry\\Instrumentation\\hook(
+    \\Symfony\\Component\\HttpKernel\\HttpKernel::class,
+    'handle',
+    post: static function (
+        \\Symfony\\Component\\HttpKernel\\HttpKernel $kernel,
+        array $params,
+        mixed $returnValue,
+        ?\\Throwable $exception
+    ): void {
+        $request = ($params[0] instanceof \\Symfony\\Component\\HttpFoundation\\Request) ? $params[0] : null;
+        if (null === $request) return;
+
+        $type = $params[1] ?? \\Symfony\\Component\\HttpKernel\\HttpKernelInterface::MAIN_REQUEST;
+
+        if ($type === \\Symfony\\Component\\HttpKernel\\HttpKernelInterface::SUB_REQUEST) {
+            $scope = \\OpenTelemetry\\Context\\Context::storage()->scope();
+            if (null !== $scope) {
+                $span = \\OpenTelemetry\\API\\Trace\\Span::fromContext($scope->context());
+                $scope->detach();
+                $span->end();
+            }
+            return;
+        }
+
+        $routeParams = $request->attributes->get('_route_params', []);
+        $path = $request->getPathInfo();
+        if (\\is_array($routeParams)) {
+            foreach ($routeParams as $name => $value) {
+                if (\\is_string($value) && '' !== $value) {
+                    $path = str_replace($value, '{' . $name . '}', $path);
+                }
+            }
+        }
+
+        $request->attributes->set('_route', $path);
+    }
+);
+
+$kernel = new Kernel($_SERVER['APP_ENV'] ?? 'dev', (bool) ($_SERVER['APP_DEBUG'] ?? true));
+$request = \\Symfony\\Component\\HttpFoundation\\Request::createFromGlobals();
+$response = $kernel->handle($request);
+$response->send();
+$kernel->terminate($request, $response);`;
 
 		case 'cloudflare':
 			return '';
@@ -242,8 +289,21 @@ func main() {
 
 export function getTestingRouteCode(framework?: Framework): string {
 	if (framework === 'symfony') {
-		return `// In any controller action
-throw new \\RuntimeException("Test error from Traceway integration");`;
+		return `<?php
+// src/Controller/TestController.php
+namespace App\\Controller;
+
+use Symfony\\Component\\HttpFoundation\\Response;
+use Symfony\\Component\\Routing\\Attribute\\Route;
+
+class TestController
+{
+    #[Route('/testing', name: 'testing')]
+    public function index(): Response
+    {
+        throw new \\RuntimeException("Test error from Traceway integration");
+    }
+}`;
 	}
 	if (framework && isJsFramework(framework)) {
 		return `// Trigger a test error
@@ -256,8 +316,7 @@ throw new Error("Test error from Traceway integration");`;
 
 export function getTestingRouteCode2(framework?: Framework): string {
 	if (framework === 'symfony') {
-		return `// In any controller action
-throw new \\RuntimeException("Test error from Traceway integration");`;
+		return '';
 	}
 	if (framework && isJsFramework(framework)) {
 		switch (framework) {
@@ -323,8 +382,8 @@ export function getFrameworkLabel(framework: Framework): string {
 	return labels[framework] || framework;
 }
 
-export function getCodeLanguage(framework: Framework): 'go' | 'javascript' | 'bash' {
-	if (framework === 'symfony') return 'bash';
+export function getCodeLanguage(framework: Framework): 'go' | 'javascript' | 'bash' | 'php' {
+	if (framework === 'symfony') return 'php';
 	if (framework === 'opentelemetry') return 'go';
 	if (framework === 'cloudflare') return 'javascript';
 	return isJsFramework(framework) ? 'javascript' : 'go';

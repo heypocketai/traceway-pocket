@@ -169,6 +169,9 @@ func getHTTPEndpoint(attrs []*commonpb.KeyValue, fallback string) string {
 		method = getStringAttribute(attrs, "http.method")
 	}
 	route := getStringAttribute(attrs, "http.route")
+	if route != "" && !strings.HasPrefix(route, "/") {
+		route = ""
+	}
 	if route == "" {
 		route = getStringAttribute(attrs, "url.path")
 	}

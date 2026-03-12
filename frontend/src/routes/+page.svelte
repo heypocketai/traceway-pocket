@@ -36,6 +36,7 @@
 	import go from 'svelte-highlight/languages/go';
 	import javascript from 'svelte-highlight/languages/javascript';
 	import bash from 'svelte-highlight/languages/bash';
+	import php from 'svelte-highlight/languages/php';
 	import { themeState } from '$lib/state/theme.svelte';
 	import yaml from 'svelte-highlight/languages/yaml';
 	import 'svelte-highlight/styles/github-dark.css';
@@ -124,7 +125,7 @@
 		projectWithToken ? getCodeLanguage(projectWithToken.framework) : ('go' as const)
 	);
 
-	const highlightLanguage = $derived(codeLanguage === 'javascript' ? javascript : codeLanguage === 'bash' ? bash : go);
+	const highlightLanguage = $derived(codeLanguage === 'javascript' ? javascript : codeLanguage === 'php' ? php : codeLanguage === 'bash' ? bash : go);
 
 	const testingRouteCode = $derived(getTestingRouteCode(projectWithToken?.framework));
 	const testingRouteCode2 = $derived(getTestingRouteCode2(projectWithToken?.framework));
@@ -307,8 +308,18 @@ service:
 		}
 	}
 
+	let lastProjectId = $state(projectsState.currentProjectId);
+
 	onMount(() => {
 		loadDashboard();
+	});
+
+	$effect(() => {
+		const currentId = projectsState.currentProjectId;
+		if (currentId !== lastProjectId) {
+			lastProjectId = currentId;
+			loadDashboard();
+		}
 	});
 
 	function resetEndpointsSortToImpact() {
@@ -742,6 +753,7 @@ service:
 								</div>
 							</div>
 
+							{#if testingRouteCode2}
 							<div class="flex justify-center p-2 italic">or</div>
 
 							<div class="relative">
@@ -764,6 +776,7 @@ service:
 									<Highlight language={highlightLanguage} code={testingRouteCode2} />
 								</div>
 							</div>
+							{/if}
 						</div>
 					</div>
 				{/if}
@@ -1025,6 +1038,12 @@ service:
 	:global(.light-code .hljs-built_in) {
 		color: #005cc5;
 	}
+	:global(.light-code .hljs-meta) {
+		color: #d73a49;
+	}
+	:global(.light-code .hljs-variable) {
+		color: #24292e;
+	}
 
 	/* Dark theme - ensure dark styles apply */
 	:global(.dark-code .hljs) {
@@ -1048,5 +1067,8 @@ service:
 	}
 	:global(.dark-code .hljs-built_in) {
 		color: #79c0ff;
+	}
+	:global(.dark-code .hljs-meta) {
+		color: #ff7b72;
 	}
 </style>

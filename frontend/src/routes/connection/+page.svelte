@@ -22,6 +22,7 @@
 	import go from 'svelte-highlight/languages/go';
 	import javascript from 'svelte-highlight/languages/javascript';
 	import bash from 'svelte-highlight/languages/bash';
+	import php from 'svelte-highlight/languages/php';
 	import yaml from 'svelte-highlight/languages/yaml';
 	import { themeState } from '$lib/state/theme.svelte';
 	import 'svelte-highlight/styles/github-dark.css';
@@ -106,7 +107,7 @@ service:
 
 	const highlightLanguage = $derived.by(() => {
 		if (!projectWithToken) return go;
-		if (projectWithToken.framework === 'symfony') return bash;
+		if (projectWithToken.framework === 'symfony') return php;
 		if (isJsFramework(projectWithToken.framework)) return javascript;
 		return go;
 	});
@@ -550,6 +551,12 @@ service:
 	:global(.light-code .hljs-built_in) {
 		color: #005cc5;
 	}
+	:global(.light-code .hljs-meta) {
+		color: #d73a49;
+	}
+	:global(.light-code .hljs-variable) {
+		color: #24292e;
+	}
 
 	/* Dark theme - ensure dark styles apply */
 	:global(.dark-code .hljs) {
@@ -573,5 +580,8 @@ service:
 	}
 	:global(.dark-code .hljs-built_in) {
 		color: #79c0ff;
+	}
+	:global(.dark-code .hljs-meta) {
+		color: #ff7b72;
 	}
 </style>

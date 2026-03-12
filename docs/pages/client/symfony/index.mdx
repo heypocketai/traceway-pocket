@@ -43,12 +43,84 @@ OTEL_PHP_AUTOLOAD_ENABLED=true
 OTEL_SERVICE_NAME=my-symfony-app
 OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
-OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 OTEL_EXPORTER_OTLP_ENDPOINT=https://your-traceway-instance.com/api/otel
-OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer your-project-token
+OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-project-token"
 ```
 
 Your Traceway dashboard includes a **Connection** page with a ready-made config snippet and your project token. Go to **Connection** in the sidebar to grab it.
+
+> **Note:** Use `http/json` instead of `http/protobuf`. The protobuf encoder has known deprecation warnings on PHP 8.4+ that can cause noisy logs.
+
+## Step 4: Update Your Front Controller
+
+The `opentelemetry-auto-symfony` package has two issues that need a workaround in your `public/index.php`:
+
+1. **Endpoint names** — `http.route` is set to the internal Symfony route name (e.g., `app_user_show`) instead of the URL path template (`/users/{id}`)
+2. **500 errors not exported** — when Symfony renders an error page via a sub-request, the sub-request's OTel scope shadows the main request's scope, causing the main span to never be ended or exported
+
+Register this hook **after** the OTel autoloader to fix both issues:
+
+```php
+<?php
+// public/index.php
+
+use App\Kernel;
+
+require_once dirname(__DIR__) . '/vendor/autoload.php';
+
+\OpenTelemetry\SDK\SdkAutoloader::autoload();
+
+// Fixes for Symfony's OTel auto-instrumentation:
+// 1. Corrects http.route from internal route name to URL path template
+// 2. Cleans up sub-request scopes so 500 error spans are exported
+\OpenTelemetry\Instrumentation\hook(
+    \Symfony\Component\HttpKernel\HttpKernel::class,
+    'handle',
+    post: static function (
+        \Symfony\Component\HttpKernel\HttpKernel $kernel,
+        array $params,
+        mixed $returnValue,
+        ?\Throwable $exception
+    ): void {
+        $request = ($params[0] instanceof \Symfony\Component\HttpFoundation\Request) ? $params[0] : null;
+        if (null === $request) return;
+
+        $type = $params[1] ?? \Symfony\Component\HttpKernel\HttpKernelInterface::MAIN_REQUEST;
+
+        // Sub-requests (e.g., error page rendering) push an extra OTel scope
+        // that shadows the main request. Clean up immediately.
+        if ($type === \Symfony\Component\HttpKernel\HttpKernelInterface::SUB_REQUEST) {
+            $scope = \OpenTelemetry\Context\Context::storage()->scope();
+            if (null !== $scope) {
+                $span = \OpenTelemetry\API\Trace\Span::fromContext($scope->context());
+                $scope->detach();
+                $span->end();
+            }
+            return;
+        }
+
+        // For main requests: fix route name to path template
+        $routeParams = $request->attributes->get('_route_params', []);
+        $path = $request->getPathInfo();
+        if (\is_array($routeParams)) {
+            foreach ($routeParams as $name => $value) {
+                if (\is_string($value) && '' !== $value) {
+                    $path = str_replace($value, '{' . $name . '}', $path);
+                }
+            }
+        }
+
+        $request->attributes->set('_route', $path);
+    }
+);
+
+$kernel = new Kernel($_SERVER['APP_ENV'] ?? 'dev', (bool) ($_SERVER['APP_DEBUG'] ?? true));
+$request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+$response = $kernel->handle($request);
+$response->send();
+$kernel->terminate($request, $response);
+```
 
 ## What Gets Captured
 
