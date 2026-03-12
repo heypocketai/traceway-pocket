@@ -308,8 +308,18 @@ service:
 		}
 	}
 
+	let lastProjectId = $state(projectsState.currentProjectId);
+
 	onMount(() => {
 		loadDashboard();
+	});
+
+	$effect(() => {
+		const currentId = projectsState.currentProjectId;
+		if (currentId !== lastProjectId) {
+			lastProjectId = currentId;
+			loadDashboard();
+		}
 	});
 
 	function resetEndpointsSortToImpact() {

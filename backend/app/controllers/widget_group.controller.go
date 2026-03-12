@@ -38,7 +38,11 @@ func (c *widgetGroupController) List(ctx *gin.Context) {
 			ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find project: %w", err))
 			return
 		}
-		if project == nil || project.Framework != "opentelemetry" {
+		goFrameworks := map[string]bool{
+			"gin": true, "fiber": true, "chi": true,
+			"fasthttp": true, "stdlib": true, "custom": true,
+		}
+		if project != nil && goFrameworks[project.Framework] {
 			if err := ensureDefaultWidgetGroups(tx, projectId); err != nil {
 				ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to create default widget groups: %w", err))
 				return
