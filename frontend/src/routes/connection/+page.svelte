@@ -104,9 +104,12 @@ service:
 		projectWithToken ? getInstallCommand(projectWithToken.framework) : 'go get go.tracewayapp.com'
 	);
 
-	const highlightLanguage = $derived(
-		projectWithToken && isJsFramework(projectWithToken.framework) ? javascript : go
-	);
+	const highlightLanguage = $derived.by(() => {
+		if (!projectWithToken) return go;
+		if (projectWithToken.framework === 'symfony') return bash;
+		if (isJsFramework(projectWithToken.framework)) return javascript;
+		return go;
+	});
 
 	const isJs = $derived(projectWithToken ? isJsFramework(projectWithToken.framework) : false);
 	const isReadonly = $derived(
@@ -410,7 +413,7 @@ service:
 				<CardHeader>
 					<CardTitle>Installation</CardTitle>
 					<CardDescription
-						>Install the required packages{isJs ? '' : ' using go get'}.</CardDescription
+						>Install the required packages{isJs ? '' : projectWithToken?.framework === 'symfony' ? ' using composer' : ' using go get'}.</CardDescription
 					>
 				</CardHeader>
 				<CardContent>

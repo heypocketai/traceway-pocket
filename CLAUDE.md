@@ -1258,3 +1258,21 @@ type PaginationParams struct {
    ```typescript
    const orderBy = `${sortState.field} ${sortState.direction}`
    ```
+
+### Adding a New Framework
+
+Every framework addition touches multiple files across backend, frontend, and docs. Use this checklist to avoid missing any:
+
+1. **Backend** — `backend/app/controllers/project.controller.go`: Add to `validFrameworks` map and update the validation error message
+2. **Frontend state** — `frontend/src/lib/state/projects.svelte.ts`: Add to `Framework` type union and `FRAMEWORK_LABELS` map
+3. **Frontend combobox** — `frontend/src/lib/components/framework-combobox.svelte`: Add entry with correct group (Go / JavaScript / PHP / etc.)
+4. **Frontend icon** — `frontend/src/lib/components/framework-icon.svelte`: Add icon mapping for the new framework value
+5. **Framework code** — `frontend/src/lib/utils/framework-code.ts`: Add install command, integration code snippet, label, code language, and testing routes
+6. **Connection page** — `frontend/src/routes/connection/+page.svelte`: Add highlight language mapping and install description
+7. **Dashboard page** — `frontend/src/routes/+page.svelte`: Add highlight language mapping
+8. **Docs sidebar** — `docs/pages/client/_meta.json`: Add navigation entry
+9. **Docs SDK selector** — `docs/components/SdkContext.jsx`: Add to `SDK_OPTIONS` array and `PATH_SDK_MAP` object
+10. **Docs framework picker** — `docs/components/FrameworkPicker.jsx`: Add card to `FRAMEWORKS` array
+11. **Docs icon** — `docs/public/`: Add framework icon (PNG, ~45x45)
+12. **Docs page** — `docs/pages/client/<framework>/`: Create `_meta.json` and `index.mdx`
+13. **Docs OTel language table** — `docs/pages/client/otel/index.mdx`: Add row if the framework uses OTLP

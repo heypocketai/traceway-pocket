@@ -19,6 +19,14 @@ const FRAMEWORKS = [
     badge: "new",
   },
   {
+    value: "php-symfony",
+    label: "Symfony",
+    description: "Symfony framework with OpenTelemetry auto-instrumentation.",
+    icon: "/symfony.png",
+    href: "/client/symfony",
+    badge: "new",
+  },
+  {
     value: "go-gin",
     label: "Go Gin",
     description:

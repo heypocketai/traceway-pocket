@@ -124,7 +124,7 @@
 		projectWithToken ? getCodeLanguage(projectWithToken.framework) : ('go' as const)
 	);
 
-	const highlightLanguage = $derived(codeLanguage === 'javascript' ? javascript : go);
+	const highlightLanguage = $derived(codeLanguage === 'javascript' ? javascript : codeLanguage === 'bash' ? bash : go);
 
 	const testingRouteCode = $derived(getTestingRouteCode(projectWithToken?.framework));
 	const testingRouteCode2 = $derived(getTestingRouteCode2(projectWithToken?.framework));

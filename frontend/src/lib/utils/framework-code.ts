@@ -28,6 +28,8 @@ export function getInstallCommand(framework: Framework): string {
 			return 'npm install @tracewayapp/express';
 		case 'remix':
 			return 'npm install @tracewayapp/remix';
+		case 'symfony':
+			return 'composer require open-telemetry/sdk open-telemetry/exporter-otlp';
 		case 'cloudflare':
 			return '';
 		case 'opentelemetry':
@@ -204,6 +206,16 @@ export default withTraceway({
     connectionString: "${connectionString}",
 });`;
 
+		case 'symfony':
+			return `# Add to your .env file
+OTEL_PHP_AUTOLOAD_ENABLED=true
+OTEL_SERVICE_NAME=my-symfony-app
+OTEL_TRACES_EXPORTER=otlp
+OTEL_METRICS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_ENDPOINT=${backendUrl}/api/otel
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer ${token || 'YOUR_TOKEN'}`;
+
 		case 'cloudflare':
 			return '';
 
@@ -229,6 +241,10 @@ func main() {
 }
 
 export function getTestingRouteCode(framework?: Framework): string {
+	if (framework === 'symfony') {
+		return `// In any controller action
+throw new \\RuntimeException("Test error from Traceway integration");`;
+	}
 	if (framework && isJsFramework(framework)) {
 		return `// Trigger a test error
 throw new Error("Test error from Traceway integration");`;
@@ -239,6 +255,10 @@ throw new Error("Test error from Traceway integration");`;
 }
 
 export function getTestingRouteCode2(framework?: Framework): string {
+	if (framework === 'symfony') {
+		return `// In any controller action
+throw new \\RuntimeException("Test error from Traceway integration");`;
+	}
 	if (framework && isJsFramework(framework)) {
 		switch (framework) {
 			case 'react':
@@ -298,11 +318,13 @@ export function getFrameworkLabel(framework: Framework): string {
 		remix: 'Remix',
 		cloudflare: 'Cloudflare',
 		opentelemetry: 'OpenTelemetry',
+		symfony: 'Symfony',
 	};
 	return labels[framework] || framework;
 }
 
-export function getCodeLanguage(framework: Framework): 'go' | 'javascript' {
+export function getCodeLanguage(framework: Framework): 'go' | 'javascript' | 'bash' {
+	if (framework === 'symfony') return 'bash';
 	if (framework === 'opentelemetry') return 'go';
 	if (framework === 'cloudflare') return 'javascript';
 	return isJsFramework(framework) ? 'javascript' : 'go';

@@ -1,0 +1,88 @@
+# Symfony
+
+Symfony integrates with Traceway via [OpenTelemetry](https://opentelemetry.io/). The PHP OTel extension auto-instruments your Symfony application and exports traces and metrics to Traceway's OTLP endpoints — no manual instrumentation needed.
+
+## Prerequisites
+
+- PHP 8.1+
+- Composer
+- A Traceway project (create one in the dashboard)
+
+## Step 1: Install the PHP OTel Extension
+
+The OpenTelemetry PHP extension provides auto-instrumentation:
+
+```bash
+pecl install opentelemetry
+```
+
+Enable it in your `php.ini`:
+
+```ini
+extension=opentelemetry.so
+```
+
+## Step 2: Install Composer Packages
+
+```bash
+composer require open-telemetry/sdk open-telemetry/exporter-otlp
+```
+
+For automatic Symfony instrumentation, also install:
+
+```bash
+composer require open-telemetry/opentelemetry-auto-symfony
+```
+
+## Step 3: Configure Environment Variables
+
+Add the following to your `.env` file, replacing the endpoint and token with your project values:
+
+```bash
+OTEL_PHP_AUTOLOAD_ENABLED=true
+OTEL_SERVICE_NAME=my-symfony-app
+OTEL_TRACES_EXPORTER=otlp
+OTEL_METRICS_EXPORTER=otlp
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_ENDPOINT=https://your-traceway-instance.com/api/otel
+OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer your-project-token
+```
+
+Your Traceway dashboard includes a **Connection** page with a ready-made config snippet and your project token. Go to **Connection** in the sidebar to grab it.
+
+## What Gets Captured
+
+Once configured, the OTel auto-instrumentation captures:
+
+- **Endpoints** — every HTTP request handled by Symfony (method, route, duration)
+- **Status codes** — 2xx, 4xx, 5xx responses
+- **Exceptions** — unhandled errors and exceptions with stack traces
+- **Metrics** — request count, duration histograms
+
+## Test Your Integration
+
+Add a test route to verify data is flowing:
+
+```php
+// src/Controller/TestController.php
+namespace App\Controller;
+
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
+class TestController
+{
+    #[Route('/testing', name: 'testing')]
+    public function index(): Response
+    {
+        throw new \RuntimeException("Test error from Traceway integration");
+    }
+}
+```
+
+Visit `/testing` in your browser, then check the Traceway dashboard — the exception should appear within a few seconds.
+
+## Next Steps
+
+- [OpenTelemetry docs](/client/otel) — learn more about how OTel traces and metrics map to Traceway
+- [Connection page](/client/otel#connection-page) — grab your project-specific config from the dashboard

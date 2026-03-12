@@ -16,6 +16,8 @@ const SDK_QUICK_START = {
   'js-svelte': '/client/svelte',
   'js-generic': '/client/js-sdk',
   'otel': '/client/otel',
+  'cloudflare': '/client/cloudflare',
+  'php-symfony': '/client/symfony',
 }
 
 export default function SdkSelector() {

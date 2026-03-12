@@ -16,6 +16,7 @@ export const SDK_OPTIONS = [
   { value: 'js-generic', label: 'JS Generic' },
   { value: 'otel', label: 'OpenTelemetry (otel)' },
   { value: 'cloudflare', label: 'Cloudflare Workers' },
+  { value: 'php-symfony', label: 'Symfony' },
 ]
 
 const STORAGE_KEY = 'traceway-docs-sdk'
@@ -34,6 +35,7 @@ const PATH_SDK_MAP = {
   'svelte': 'js-svelte',
   'otel': 'otel',
   'cloudflare': 'cloudflare',
+  'symfony': 'php-symfony',
 }
 
 const SdkContext = createContext({

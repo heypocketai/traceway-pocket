@@ -20,6 +20,7 @@ const SDK_VISIBILITY = {
   "js-sdk": "js-",
   otel: "otel",
   cloudflare: "cloudflare",
+  symfony: "php-symfony",
 };
 
 export default {
