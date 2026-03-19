@@ -12,6 +12,12 @@ func (metricRegistryNaming) GetTableNameFromStructName(string) string {
 	return "metric_registry"
 }
 
+type notificationHistoryNaming struct{ lit.DefaultDbNamingStrategy }
+
+func (notificationHistoryNaming) GetTableNameFromStructName(string) string {
+	return "notification_history"
+}
+
 func Init(driver lit.Driver) {
 	lit.RegisterModel[Project](driver)
 	lit.RegisterModel[User](driver)
@@ -28,7 +34,7 @@ func Init(driver lit.Driver) {
 	lit.RegisterModel[WidgetGroupWidget](driver)
 	lit.RegisterModel[NotificationChannel](driver)
 	lit.RegisterModel[NotificationRule](driver)
-	lit.RegisterModel[NotificationHistory](driver)
+	lit.RegisterModelWithNaming[NotificationHistory](driver, notificationHistoryNaming{})
 	lit.RegisterModel[NotificationRuleWithChannel](driver)
 
 	for _, register := range ExtensionModelRegistrations {

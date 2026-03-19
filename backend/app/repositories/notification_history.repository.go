@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/tracewayapp/traceway/backend/app/models"
 
@@ -11,13 +12,22 @@ import (
 
 type notificationHistoryRepository struct{}
 
-func (r *notificationHistoryRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID, page, pageSize int, search string) ([]*models.NotificationHistory, int64, error) {
+func (r *notificationHistoryRepository) FindByProject(tx *sql.Tx, projectId uuid.UUID, page, pageSize int, search string, fromDate, toDate *time.Time) ([]*models.NotificationHistory, int64, error) {
 	params := lit.P{"project_id": projectId}
 	whereClause := "WHERE project_id = :project_id"
 
 	if search != "" {
 		whereClause += " AND (rule_name ILIKE :search OR channel_name ILIKE :search OR subject ILIKE :search)"
 		params["search"] = "%" + search + "%"
+	}
+
+	if fromDate != nil {
+		whereClause += " AND created_at >= :from_date"
+		params["from_date"] = *fromDate
+	}
+	if toDate != nil {
+		whereClause += " AND created_at <= :to_date"
+		params["to_date"] = *toDate
 	}
 
 	countResult, err := lit.SelectSingleNamed[models.CountResult](
@@ -38,7 +48,7 @@ func (r *notificationHistoryRepository) FindByProject(tx *sql.Tx, projectId uuid
 	params["offset"] = offset
 	items, err := lit.SelectNamed[models.NotificationHistory](
 		tx,
-		"SELECT id, project_id, rule_id, channel_id, rule_type, rule_name, channel_name, severity, subject, body, status, error_message, created_at FROM notification_history "+whereClause+" ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+		"SELECT id, project_id, rule_id, channel_id, rule_type, rule_name, channel_name, severity, subject, body, status, error_message, url, created_at FROM notification_history "+whereClause+" ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
 		params,
 	)
 	if err != nil {

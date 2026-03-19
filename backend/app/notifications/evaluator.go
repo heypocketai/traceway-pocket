@@ -78,7 +78,13 @@ func evaluatePolledRules(ctx context.Context) {
 		}
 
 		if result != nil && result.Fired {
-			dispatch(rule, result.Message)
+			if len(result.Messages) > 0 {
+				for _, msg := range result.Messages {
+					dispatch(rule, msg)
+				}
+			} else {
+				dispatch(rule, result.Message)
+			}
 		}
 	}
 }

@@ -1,9 +1,11 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
 	import { projectsState } from '$lib/state/projects.svelte';
+	import { getTimezone } from '$lib/state/timezone.svelte';
 	import { LoadingCircle } from '$lib/components/ui/loading-circle';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
@@ -16,6 +18,17 @@
 	import { Plus, Pencil, Trash2, Zap, ZapOff, Clock, Send, Info } from '@lucide/svelte';
 	import { SearchBar } from '$lib/components/ui/search-bar';
 	import { TableEmptyState } from '$lib/components/ui/table-empty-state';
+	import { TimeRangePicker } from '$lib/components/ui/time-range-picker';
+	import { CalendarDate } from '@internationalized/date';
+	import {
+		parseTimeRangeFromUrl,
+		getResolvedTimeRange,
+		getTimeRangeFromPreset,
+		dateToCalendarDate,
+		dateToTimeString,
+		updateUrl
+	} from '$lib/utils/url-params';
+	import { calendarDateTimeToLuxon, toUTCISO } from '$lib/utils/formatters';
 
 	import ChannelDialog from './channel-dialog.svelte';
 	import RuleDialog from './rule-dialog.svelte';
@@ -40,6 +53,7 @@
 		config: any;
 		enabled: boolean;
 		cooldownMinutes: number;
+		severity: string;
 		snoozedUntil: string | null;
 		channelName: string;
 		channelType: string;
@@ -56,6 +70,7 @@
 		body: string;
 		status: string;
 		errorMessage: string | null;
+		url: string;
 		createdAt: string;
 	}
 
@@ -98,7 +113,15 @@
 	function setTab(tab: string) {
 		const url = new URL(window.location.href);
 		url.searchParams.set('tab', tab);
+		if (tab !== 'history') {
+			url.searchParams.delete('preset');
+			url.searchParams.delete('from');
+			url.searchParams.delete('to');
+		}
 		goto(url.toString(), { replaceState: true, noScroll: true });
+		if (tab === 'history') {
+			loadHistory(false);
+		}
 	}
 
 	let channels = $state<NotificationChannel[]>([]);
@@ -115,6 +138,52 @@
 	let historyTotalPages = $state(0);
 	let searchQuery = $state('');
 
+	const timezone = $derived(getTimezone());
+
+	function parseHistoryUrlParams() {
+		if (!browser) return { preset: '7d', from: null, to: null };
+		return parseTimeRangeFromUrl(timezone, '7d');
+	}
+
+	const initialUrlParams = parseHistoryUrlParams();
+	const initialRange = getResolvedTimeRange(initialUrlParams, timezone);
+
+	let selectedPreset = $state<string | null>(initialUrlParams.preset);
+	let fromDate = $state<CalendarDate>(dateToCalendarDate(initialRange.from, timezone));
+	let toDate = $state<CalendarDate>(dateToCalendarDate(initialRange.to, timezone));
+	let fromTime = $state(dateToTimeString(initialRange.from, timezone));
+	let toTime = $state(dateToTimeString(initialRange.to, timezone));
+
+	function getFromDateTimeUTC(): string {
+		const [hour, minute] = fromTime.split(':').map(Number);
+		const luxonDt = calendarDateTimeToLuxon(
+			{ year: fromDate.year, month: fromDate.month, day: fromDate.day, hour, minute },
+			timezone
+		);
+		return toUTCISO(luxonDt);
+	}
+
+	function getToDateTimeUTC(): string {
+		const [hour, minute] = toTime.split(':').map(Number);
+		const luxonDt = calendarDateTimeToLuxon(
+			{ year: toDate.year, month: toDate.month, day: toDate.day, hour, minute },
+			timezone
+		).endOf('minute');
+		return toUTCISO(luxonDt);
+	}
+
+	function updateHistoryUrl(pushToHistory = true) {
+		const params: Record<string, string | null | undefined> = {};
+		params.tab = 'history';
+		if (selectedPreset) {
+			params.preset = selectedPreset;
+		} else {
+			params.from = getFromDateTimeUTC();
+			params.to = getToDateTimeUTC();
+		}
+		updateUrl(params, { pushToHistory });
+	}
+
 	let channelDialogOpen = $state(false);
 	let editingChannel = $state<NotificationChannel | null>(null);
 	let ruleDialogOpen = $state(false);
@@ -127,6 +196,15 @@
 
 	let showDeleteRuleDialog = $state(false);
 	let deletingRule = $state<NotificationRule | null>(null);
+
+	let showToggleRuleDialog = $state(false);
+	let togglingRule = $state<NotificationRule | null>(null);
+	let togglingLoading = $state(false);
+
+	let showTestChannelDialog = $state(false);
+	let testingChannel = $state<NotificationChannel | null>(null);
+	let testingLoading = $state(false);
+	let testError = $state('');
 
 	async function loadChannels() {
 		channelsLoading = true;
@@ -156,14 +234,27 @@
 		}
 	}
 
-	async function loadHistory() {
+	async function loadHistory(pushToHistory = true) {
 		historyLoading = true;
+
+		if (selectedPreset) {
+			const range = getTimeRangeFromPreset(selectedPreset, timezone);
+			fromDate = dateToCalendarDate(range.from, timezone);
+			toDate = dateToCalendarDate(range.to, timezone);
+			fromTime = dateToTimeString(range.from, timezone);
+			toTime = dateToTimeString(range.to, timezone);
+		}
+
+		updateHistoryUrl(pushToHistory);
+
 		try {
 			const res = await api.post(
 				'/notification-history',
 				{
 					pagination: { page: historyPage, pageSize: historyPageSize },
-					search: searchQuery.trim()
+					search: searchQuery.trim(),
+					fromDate: getFromDateTimeUTC(),
+					toDate: getToDateTimeUTC()
 				},
 				{ projectId: projectsState.currentProjectId ?? undefined }
 			);
@@ -179,7 +270,7 @@
 
 	function handleHistorySearch() {
 		historyPage = 1;
-		loadHistory();
+		loadHistory(true);
 	}
 
 	function openDeleteChannel(channel: NotificationChannel) {
@@ -203,18 +294,35 @@
 		}
 	}
 
-	async function testChannel(id: number) {
+	function openTestChannel(channel: NotificationChannel) {
+		testingChannel = channel;
+		testError = '';
+		showTestChannelDialog = true;
+	}
+
+	async function confirmTestChannel() {
+		if (!testingChannel) return;
+		testingLoading = true;
+		testError = '';
 		try {
 			await api.post(
-				`/notification-channels/${id}/test`,
+				`/notification-channels/${testingChannel.id}/test`,
 				{},
-				{
-					projectId: projectsState.currentProjectId ?? undefined
-				}
+				{ projectId: projectsState.currentProjectId ?? undefined }
 			);
 			toast.success('Test notification sent', { position: 'top-center' });
+			showTestChannelDialog = false;
+			testingChannel = null;
 		} catch (e: any) {
-			toast.error(e.message || 'Test failed', { position: 'top-center' });
+			if (e.status === 422) {
+				testError = e.message || 'Validation failed';
+			} else {
+				toast.error('An unexpected error has occurred', { position: 'top-center' });
+				showTestChannelDialog = false;
+				testingChannel = null;
+			}
+		} finally {
+			testingLoading = false;
 		}
 	}
 
@@ -238,18 +346,29 @@
 		}
 	}
 
-	async function toggleRule(id: number) {
+	function openToggleRule(rule: NotificationRule) {
+		togglingRule = rule;
+		showToggleRuleDialog = true;
+	}
+
+	async function confirmToggleRule() {
+		if (!togglingRule) return;
+		togglingLoading = true;
 		try {
+			const action = togglingRule.enabled ? 'disabled' : 'enabled';
 			await api.post(
-				`/notification-rules/${id}/toggle`,
+				`/notification-rules/${togglingRule.id}/toggle`,
 				{},
-				{
-					projectId: projectsState.currentProjectId ?? undefined
-				}
+				{ projectId: projectsState.currentProjectId ?? undefined }
 			);
+			toast.success(`Successfully ${action} the Rule`, { position: 'top-center' });
+			showToggleRuleDialog = false;
+			togglingRule = null;
 			loadRules();
 		} catch {
 			toast.error('Failed to toggle rule', { position: 'top-center' });
+		} finally {
+			togglingLoading = false;
 		}
 	}
 
@@ -297,19 +416,52 @@
 
 	function handleHistoryPageChange(newPage: number) {
 		historyPage = newPage;
-		loadHistory();
+		loadHistory(true);
 	}
 
 	function handleHistoryPageSizeChange(newSize: number) {
 		historyPageSize = newSize;
 		historyPage = 1;
-		loadHistory();
+		loadHistory(true);
+	}
+
+	function handleTimeRangeChange(
+		from: { date: CalendarDate; time: string },
+		to: { date: CalendarDate; time: string },
+		preset: string | null
+	) {
+		fromDate = from.date;
+		toDate = to.date;
+		fromTime = from.time;
+		toTime = to.time;
+		selectedPreset = preset;
+		historyPage = 1;
+		loadHistory(true);
+	}
+
+	function handlePopState() {
+		const urlParams = parseHistoryUrlParams();
+		const range = getResolvedTimeRange(urlParams, timezone);
+		selectedPreset = urlParams.preset;
+		fromDate = dateToCalendarDate(range.from, timezone);
+		toDate = dateToCalendarDate(range.to, timezone);
+		fromTime = dateToTimeString(range.from, timezone);
+		toTime = dateToTimeString(range.to, timezone);
+		historyPage = 1;
+		loadHistory(false);
 	}
 
 	onMount(() => {
+		window.addEventListener('popstate', handlePopState);
 		loadChannels();
 		loadRules();
-		loadHistory();
+		loadHistory(false);
+	});
+
+	onDestroy(() => {
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('popstate', handlePopState);
+		}
 	});
 </script>
 
@@ -392,7 +544,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											onclick={() => testChannel(channel.id)}
+											onclick={() => openTestChannel(channel)}
 											title="Test"
 										>
 											<Send class="h-4 w-4" />
@@ -478,7 +630,7 @@
 										<Button
 											variant="ghost"
 											size="icon"
-											onclick={() => toggleRule(rule.id)}
+											onclick={() => openToggleRule(rule)}
 											title={rule.enabled ? 'Disable' : 'Enable'}
 										>
 											{#if rule.enabled}
@@ -512,13 +664,23 @@
 			</div>
 		{/if}
 	{:else if activeTab === 'history'}
-		<div class="pt-2">
+		<div class="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
 			<SearchBar
 				placeholder="Search Historic Alerts..."
 				bind:value={searchQuery}
 				onSearch={handleHistorySearch}
 				disabled={historyLoading}
 			/>
+			<div class="w-full sm:w-auto">
+				<TimeRangePicker
+					bind:fromDate
+					bind:toDate
+					bind:fromTime
+					bind:toTime
+					bind:preset={selectedPreset}
+					onApply={handleTimeRangeChange}
+				/>
+			</div>
 		</div>
 
 		<div class="overflow-hidden rounded-md border">
@@ -561,7 +723,13 @@
 									{/if}
 								</Table.Cell>
 								<Table.Cell class="font-medium">{item.ruleName}</Table.Cell>
-								<Table.Cell class="max-w-xs truncate">{item.subject}</Table.Cell>
+								<Table.Cell class="max-w-xs truncate">
+									{#if item.url}
+										<a href={item.url} class="text-blue-600 hover:underline dark:text-blue-400">{item.subject}</a>
+									{:else}
+										{item.subject}
+									{/if}
+								</Table.Cell>
 								<Table.Cell>{item.channelName}</Table.Cell>
 								<Table.Cell>
 									{#if item.status === 'sent'}
@@ -648,6 +816,49 @@
 		<AlertDialog.Footer>
 			<Button variant="outline" onclick={() => (showDeleteRuleDialog = false)}>Cancel</Button>
 			<Button variant="destructive" onclick={deleteRule}>Delete</Button>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root bind:open={showToggleRuleDialog}>
+	<AlertDialog.Content
+		interactOutsideBehavior={togglingLoading ? 'ignore' : 'close'}
+		escapeKeydownBehavior={togglingLoading ? 'ignore' : 'close'}
+	>
+		<AlertDialog.Header>
+			<AlertDialog.Title>{togglingRule?.enabled ? 'Disable' : 'Enable'} Rule</AlertDialog.Title>
+			<AlertDialog.Description>
+				Are you sure you want to {togglingRule?.enabled ? 'disable' : 'enable'} "{togglingRule?.name}"?
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<Button variant="outline" onclick={() => (showToggleRuleDialog = false)} disabled={togglingLoading}>Cancel</Button>
+			<Button onclick={confirmToggleRule} disabled={togglingLoading}>
+				{togglingRule?.enabled ? 'Disable' : 'Enable'}
+			</Button>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
+
+<AlertDialog.Root bind:open={showTestChannelDialog}>
+	<AlertDialog.Content
+		interactOutsideBehavior={testingLoading ? 'ignore' : 'close'}
+		escapeKeydownBehavior={testingLoading ? 'ignore' : 'close'}
+	>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Test Channel</AlertDialog.Title>
+			<AlertDialog.Description>
+				Send a test notification to "{testingChannel?.name}"? This will deliver a test message through the configured channel.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		{#if testError}
+			<p class="text-sm text-destructive">{testError}</p>
+		{/if}
+		<AlertDialog.Footer>
+			<Button variant="outline" onclick={() => (showTestChannelDialog = false)} disabled={testingLoading}>Cancel</Button>
+			<Button onclick={confirmTestChannel} disabled={testingLoading}>
+				<Send class="h-4 w-4" /> {testingLoading ? 'Sending...' : 'Send Test'}
+			</Button>
 		</AlertDialog.Footer>
 	</AlertDialog.Content>
 </AlertDialog.Root>

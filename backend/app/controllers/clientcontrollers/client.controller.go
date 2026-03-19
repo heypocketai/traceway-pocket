@@ -14,6 +14,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -195,6 +196,7 @@ func (e clientController) Report(c *gin.Context) {
 		exceptionHashes = append(exceptionHashes, est.ExceptionHash)
 	}
 
+	log.Printf("[notif] BroadcastReport: projectId=%s exceptionHashes=%d hashes=%v", projectId, len(exceptionHashes), exceptionHashes)
 	if project, exists := c.Get(middleware.ProjectContextKey); exists {
 		if p, ok := project.(*models.Project); ok && p.OrganizationId != nil {
 			hooks.BroadcastReport(hooks.ReportEvent{

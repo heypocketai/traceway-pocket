@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -76,17 +77,39 @@ func evaluateNewError(ctx context.Context, rule *models.NotificationRuleWithChan
 
 		// count > 1 means this hash already existed before this batch
 		if count > 1 {
-			continue
+			// Check if this hash was archived (resolved) — if so, a re-occurrence should be treated as new
+			var archivedCount uint64
+			archErr := chdb.Conn.QueryRow(ctx,
+				"SELECT count() FROM archived_exceptions FINAL WHERE project_id = ? AND exception_hash = ?",
+				event.ProjectId, hash).Scan(&archivedCount)
+			if archErr != nil || archivedCount == 0 {
+				continue
+			}
+
+			// Archived — only fire if this is the first re-occurrence after archiving
+			var postArchiveCount uint64
+			archErr = chdb.Conn.QueryRow(ctx,
+				"SELECT count() FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? AND recorded_at > (SELECT max(archived_at) FROM archived_exceptions FINAL WHERE project_id = ? AND exception_hash = ?)",
+				event.ProjectId, hash, event.ProjectId, hash).Scan(&postArchiveCount)
+			if archErr != nil {
+				traceway.CaptureException(fmt.Errorf("new_error post-archive count failed: %w", archErr))
+				continue
+			}
+
+			if postArchiveCount > 1 {
+				continue
+			}
 		}
 
-		errorType := getErrorTypeForHash(ctx, event.ProjectId, hash)
+		details := getExceptionDetails(ctx, event.ProjectId, hash)
 
-		if shouldIgnore(errorType, cfg.IgnorePatterns) {
+		if shouldIgnore(details.ErrorType, cfg.IgnorePatterns) {
 			continue
 		}
 
 		dedup.record(dedupKey)
-		msg := buildNewErrorMessage(errorType, hash, "")
+		projectName := getProjectName(rule.ProjectId)
+		msg := buildNewErrorMessage(details, projectName)
 		dispatch(rule, msg)
 	}
 }
@@ -112,19 +135,51 @@ func evaluateErrorRegression(ctx context.Context, rule *models.NotificationRuleW
 			continue
 		}
 
-		errorType := getErrorTypeForHash(ctx, event.ProjectId, hash)
+		details := getExceptionDetails(ctx, event.ProjectId, hash)
 		dedup.record(dedupKey)
-		msg := buildErrorRegressionMessage(errorType, hash, "")
+		projectName := getProjectName(rule.ProjectId)
+		msg := buildErrorRegressionMessage(details, projectName)
 		dispatch(rule, msg)
 	}
 }
 
-func getErrorTypeForHash(ctx context.Context, projectId uuid.UUID, hash string) string {
-	var stackTrace string
+func getExceptionDetails(ctx context.Context, projectId uuid.UUID, hash string) ExceptionDetails {
+	var id uuid.UUID
+	var stackTrace, appVersion, serverName, attributesJSON string
+	var recordedAt time.Time
+
 	err := chdb.Conn.QueryRow(ctx,
-		"SELECT stack_trace FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT 1",
-		projectId, hash).Scan(&stackTrace)
-	if err != nil || stackTrace == "" {
+		"SELECT id, stack_trace, attributes, app_version, server_name, recorded_at FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT 1",
+		projectId, hash).Scan(&id, &stackTrace, &attributesJSON, &appVersion, &serverName, &recordedAt)
+
+	details := ExceptionDetails{
+		Hash: hash,
+	}
+
+	if err != nil {
+		details.ErrorType = "Unknown Error"
+		return details
+	}
+
+	details.Id = id.String()
+	details.StackTrace = stackTrace
+	details.AppVersion = appVersion
+	details.ServerName = serverName
+	details.RecordedAt = recordedAt
+
+	if attributesJSON != "" && attributesJSON != "{}" {
+		attrs := make(map[string]string)
+		if jsonErr := json.Unmarshal([]byte(attributesJSON), &attrs); jsonErr == nil {
+			details.Attributes = attrs
+		}
+	}
+
+	details.ErrorType = extractErrorType(stackTrace)
+	return details
+}
+
+func extractErrorType(stackTrace string) string {
+	if stackTrace == "" {
 		return "Unknown Error"
 	}
 	lines := strings.SplitN(stackTrace, "\n", 2)
@@ -136,6 +191,16 @@ func getErrorTypeForHash(ctx context.Context, projectId uuid.UUID, hash string) 
 		return line
 	}
 	return "Unknown Error"
+}
+
+func getProjectName(projectId uuid.UUID) string {
+	project, err := db.ExecuteTransaction(func(tx *sql.Tx) (*models.Project, error) {
+		return repositories.ProjectRepository.FindById(tx, projectId)
+	})
+	if err != nil || project == nil {
+		return ""
+	}
+	return project.Name
 }
 
 func shouldIgnore(errorType string, patterns []string) bool {

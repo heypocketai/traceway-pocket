@@ -24,6 +24,55 @@ A channel represents a notification destination. Traceway supports four channel 
 
 Each channel has a **Test** button that sends a sample notification so you can verify the configuration before attaching rules.
 
+### Setting Up Email
+
+To receive alerts via email, add one or more recipient email addresses. Traceway will send an email to all listed recipients when a rule fires.
+
+<img src="/channel-email.png" alt="Email channel configuration dialog" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+
+### Setting Up Slack
+
+To send alerts to a Slack channel, you need an **Incoming Webhook URL**:
+
+1. Go to [api.slack.com/apps](https://api.slack.com/apps) and click **Create New App**
+2. Choose **From scratch**, give it a name (e.g. "Traceway Alerts"), and select your workspace
+3. In the app settings, navigate to **Incoming Webhooks** and toggle it **on**
+4. Click **Add New Webhook to Workspace**, select the channel you want alerts posted to, and click **Allow**
+5. Copy the **Webhook URL** — it will look like `https://hooks.slack.com/services/T.../B.../xxx`
+
+Then configure the Slack channel in Traceway:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| Webhook URL | Yes | The URL you copied from Slack |
+| Channel Override | No | Post to a different channel than the webhook default (e.g. `#incidents`) |
+| Username | No | Override the bot display name (defaults to your Slack app name) |
+
+<img src="/channel-slack.png" alt="Slack channel configuration dialog" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+
+### Setting Up GitHub
+
+To create GitHub issues from alerts, you need a **Personal Access Token** with issue permissions:
+
+1. Go to [GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+2. Click **Generate new token**
+3. Under **Resource owner**, select the account or organization that owns the target repository. If your organization doesn't appear, an org admin needs to enable fine-grained tokens under **Organization Settings → Third-party access → Personal access tokens → Settings**
+4. Set a descriptive name (e.g. "Traceway Alerts") and choose an expiration
+5. Under **Repository access**, select **Only select repositories** and choose the repo where issues should be created
+6. Under **Permissions → Repository permissions**, set **Issues** to **Read and write**
+7. Click **Generate token** and copy it — you won't be able to see it again
+
+Then configure the GitHub channel in Traceway:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| Personal Access Token | Yes | The fine-grained token you generated |
+| Owner | Yes | The repository owner (user or organization), e.g. `my-org` |
+| Repo | Yes | The repository name, e.g. `backend` |
+| Labels | No | Comma-separated labels to apply to created issues, e.g. `bug,traceway` |
+
+<img src="/channel-github.png" alt="GitHub channel configuration dialog" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+
 ### Webhook Payload
 
 When a webhook channel fires, Traceway sends a JSON POST request with the following fields:
@@ -39,6 +88,8 @@ When a webhook channel fires, Traceway sends a JSON POST request with the follow
 | `timestamp` | When the alert fired (ISO 8601) |
 
 If you configure an HMAC secret on the channel, each request includes an `X-Traceway-Signature` header containing `sha256=<hex>` of the request body, which you can use to verify that the request came from Traceway.
+
+<img src="/channel-webhook.png" alt="Webhook channel configuration dialog" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
 
 ## Rules
 
@@ -80,13 +131,15 @@ New Issue rules are evaluated immediately when new data arrives during report in
 
 ## Severity
 
-Each alert is assigned a severity level based on the condition:
+Each rule has a **Severity** setting that controls the severity level attached to its notifications. The default is **Auto**, which assigns severity based on the condition:
 
-| Severity | Typical Triggers |
-|----------|-----------------|
-| Critical | New errors, critical impact score |
-| Warning  | High impact score |
+| Severity | Auto Triggers |
+|----------|--------------|
+| Critical | New errors, critical impact score, error regressions |
+| Warning  | High impact score, elevated error/latency thresholds |
 | Info     | Medium impact score |
+
+You can override the automatic severity by setting it explicitly on a rule to **Critical**, **Warning**, or **Info**. This is useful when you want a normally-warning condition to page as critical, or to downgrade noisy rules to info.
 
 ## History
 
@@ -95,12 +148,6 @@ All fired notifications are recorded and visible in the **History** tab on the A
 | Field | Description |
 |-------|-------------|
 | Severity | Critical, warning, or info |
-| Rule Name | The rule that triggered |
-| Subject | Alert title summarizing the condition |
-| Channel | Which channel delivered the notification |
-| Status | Whether delivery succeeded or failed |
-| Timestamp | When the notification was sent |
-erity | Critical, warning, or info |
 | Rule Name | The rule that triggered |
 | Subject | Alert title summarizing the condition |
 | Channel | Which channel delivered the notification |

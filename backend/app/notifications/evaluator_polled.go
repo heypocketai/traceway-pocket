@@ -14,8 +14,9 @@ import (
 )
 
 type EvalResult struct {
-	Fired   bool
-	Message Message
+	Fired    bool
+	Message  Message
+	Messages []Message
 }
 
 type RuleEvaluator func(ctx context.Context, rule *models.NotificationRule, projectId uuid.UUID) (*EvalResult, error)
@@ -73,7 +74,8 @@ func evaluateErrorRateThreshold(ctx context.Context, rule *models.NotificationRu
 		return &EvalResult{Fired: false}, nil
 	}
 
-	msg := buildErrorRateMessage(rate, cfg.ThresholdPercent, cfg.LookbackMinutes, "")
+	projectName := getProjectName(projectId)
+	msg := buildErrorRateMessage(rate, cfg.ThresholdPercent, cfg.LookbackMinutes, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -119,7 +121,8 @@ func evaluateEndpointP95Threshold(ctx context.Context, rule *models.Notification
 	if endpoint == "" || endpoint == "*" {
 		endpoint = "all endpoints"
 	}
-	msg := buildEndpointLatencyMessage("P95", p95, cfg.ThresholdMs, endpoint, "")
+	projectName := getProjectName(projectId)
+	msg := buildEndpointLatencyMessage("P95", p95, cfg.ThresholdMs, endpoint, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -158,7 +161,8 @@ func evaluateEndpointP99Threshold(ctx context.Context, rule *models.Notification
 	if endpoint == "" || endpoint == "*" {
 		endpoint = "all endpoints"
 	}
-	msg := buildEndpointLatencyMessage("P99", p99, cfg.ThresholdMs, endpoint, "")
+	projectName := getProjectName(projectId)
+	msg := buildEndpointLatencyMessage("P99", p99, cfg.ThresholdMs, endpoint, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -203,7 +207,8 @@ func evaluateApdexDrop(ctx context.Context, rule *models.NotificationRule, proje
 		return &EvalResult{Fired: false}, nil
 	}
 
-	msg := buildApdexDropMessage(apdex, cfg.ThresholdApdex, "")
+	projectName := getProjectName(projectId)
+	msg := buildApdexDropMessage(apdex, cfg.ThresholdApdex, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -270,7 +275,8 @@ func evaluateMetricThreshold(ctx context.Context, rule *models.NotificationRule,
 		return &EvalResult{Fired: false}, nil
 	}
 
-	msg := buildMetricThresholdMessage(cfg.MetricName, value, cfg.Operator, cfg.ThresholdValue, "")
+	projectName := getProjectName(projectId)
+	msg := buildMetricThresholdMessage(cfg.MetricName, value, cfg.Operator, cfg.ThresholdValue, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -303,7 +309,8 @@ func evaluateNoData(ctx context.Context, rule *models.NotificationRule, projectI
 				return &EvalResult{Fired: false}, nil
 			}
 		}
-		msg := buildNoDataMessage("any", cfg.SilenceMinutes, "")
+		projectName := getProjectName(projectId)
+		msg := buildNoDataMessage("any", cfg.SilenceMinutes, projectName)
 		return &EvalResult{Fired: true, Message: msg}, nil
 	}
 
@@ -333,7 +340,8 @@ func evaluateNoData(ctx context.Context, rule *models.NotificationRule, projectI
 		return &EvalResult{Fired: false}, nil
 	}
 
-	msg := buildNoDataMessage(cfg.DataType, cfg.SilenceMinutes, "")
+	projectName := getProjectName(projectId)
+	msg := buildNoDataMessage(cfg.DataType, cfg.SilenceMinutes, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -368,7 +376,8 @@ func evaluateErrorCountThreshold(ctx context.Context, rule *models.NotificationR
 		return &EvalResult{Fired: false}, nil
 	}
 
-	msg := buildErrorCountMessage(int64(count), cfg.ThresholdCount, cfg.LookbackMinutes, "")
+	projectName := getProjectName(projectId)
+	msg := buildErrorCountMessage(int64(count), cfg.ThresholdCount, cfg.LookbackMinutes, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -414,7 +423,8 @@ func evaluateTaskDurationThreshold(ctx context.Context, rule *models.Notificatio
 	if taskName == "" || taskName == "*" {
 		taskName = "all tasks"
 	}
-	msg := buildTaskDurationMessage(taskName, p95, cfg.ThresholdMs, "")
+	projectName := getProjectName(projectId)
+	msg := buildTaskDurationMessage(taskName, p95, cfg.ThresholdMs, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -472,7 +482,8 @@ func evaluateThroughputDrop(ctx context.Context, rule *models.NotificationRule, 
 		return &EvalResult{Fired: false}, nil
 	}
 
-	msg := buildThroughputDropMessage(dropPercent, "")
+	projectName := getProjectName(projectId)
+	msg := buildThroughputDropMessage(dropPercent, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -514,7 +525,8 @@ func evaluateEndpointErrorRate(ctx context.Context, rule *models.NotificationRul
 		return &EvalResult{Fired: false}, nil
 	}
 
-	msg := buildEndpointErrorRateMessage(cfg.Endpoint, rate, cfg.ThresholdPercent, "")
+	projectName := getProjectName(projectId)
+	msg := buildEndpointErrorRateMessage(cfg.Endpoint, rate, cfg.ThresholdPercent, projectName)
 	return &EvalResult{Fired: true, Message: msg}, nil
 }
 
@@ -656,19 +668,26 @@ func evaluateImpactScore(ctx context.Context, rule *models.NotificationRule, pro
 	impactState[stateKey] = newSet
 	impactStateMu.Unlock()
 
-	for ep, data := range currentSet {
-		if prevSet != nil && prevSet[ep] {
-			continue
+	projectName := getProjectName(projectId)
+
+	var messages []Message
+	if prevSet != nil {
+		for ep, data := range currentSet {
+			if prevSet[ep] {
+				continue
+			}
+			reason := repositories.ComputeImpactReason(
+				ep, data.totalCount, data.satisfied, data.tolerating,
+				data.bad, data.clientErrors, data.p99, data.offsetMs,
+			)
+			messages = append(messages, buildMsg(ep, data.impact, reason, projectName))
 		}
-		reason := repositories.ComputeImpactReason(
-			ep, data.totalCount, data.satisfied, data.tolerating,
-			data.bad, data.clientErrors, data.p99, data.offsetMs,
-		)
-		msg := buildMsg(ep, data.impact, reason, "")
-		return &EvalResult{Fired: true, Message: msg}, nil
 	}
 
-	return &EvalResult{Fired: false}, nil
+	if len(messages) == 0 {
+		return &EvalResult{Fired: false}, nil
+	}
+	return &EvalResult{Fired: true, Messages: messages}, nil
 }
 
 func evaluateImpactScoreCritical(ctx context.Context, rule *models.NotificationRule, projectId uuid.UUID) (*EvalResult, error) {

@@ -28,6 +28,7 @@ type NotificationRule struct {
 	Config          json.RawMessage `json:"config" lit:"config"`
 	Enabled         bool            `json:"enabled" lit:"enabled"`
 	CooldownMinutes int             `json:"cooldownMinutes" lit:"cooldown_minutes"`
+	Severity        string          `json:"severity" lit:"severity"`
 	SnoozedUntil    *time.Time      `json:"snoozedUntil" lit:"snoozed_until"`
 	CreatedBy       *int            `json:"createdBy" lit:"created_by"`
 	CreatedAt       time.Time       `json:"createdAt" lit:"created_at"`
@@ -47,6 +48,7 @@ type NotificationHistory struct {
 	Body         string    `json:"body" lit:"body"`
 	Status       string    `json:"status" lit:"status"`
 	ErrorMessage *string   `json:"errorMessage" lit:"error_message"`
+	URL          string    `json:"url" lit:"url"`
 	CreatedAt    time.Time `json:"createdAt" lit:"created_at"`
 }
 
@@ -59,6 +61,7 @@ type NotificationRuleWithChannel struct {
 	Config          json.RawMessage `json:"config" lit:"config"`
 	Enabled         bool            `json:"enabled" lit:"enabled"`
 	CooldownMinutes int             `json:"cooldownMinutes" lit:"cooldown_minutes"`
+	Severity        string          `json:"severity" lit:"severity"`
 	SnoozedUntil    *time.Time      `json:"snoozedUntil" lit:"snoozed_until"`
 	CreatedBy       *int            `json:"createdBy" lit:"created_by"`
 	CreatedAt       time.Time       `json:"createdAt" lit:"created_at"`

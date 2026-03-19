@@ -254,7 +254,7 @@ func (ctrl *notificationChannelController) Test(ctx *gin.Context) {
 	}
 
 	if err := adapter.Send(ctx.Request.Context(), testMsg); err != nil {
-		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": err.Error()})
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("test notification failed: %w", err))
 		return
 	}
 

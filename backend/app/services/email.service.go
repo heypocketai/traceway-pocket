@@ -1,10 +1,13 @@
 package services
 
 import (
-	"github.com/tracewayapp/traceway/backend/app/config"
 	"fmt"
+	"net"
 	"net/smtp"
 	"strconv"
+	"time"
+
+	"github.com/tracewayapp/traceway/backend/app/config"
 )
 
 type emailService struct {
@@ -77,10 +80,7 @@ The Traceway Team
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s",
 		e.from, toEmail, subject, body)
 
-	auth := smtp.PlainAuth("", e.username, e.password, e.host)
-	addr := fmt.Sprintf("%s:%d", e.host, e.port)
-
-	err := smtp.SendMail(addr, auth, e.from, []string{toEmail}, []byte(msg))
+	err := e.sendMail([]string{toEmail}, []byte(msg))
 	if err != nil {
 		config.Logf("Failed to send invitation email to %s: %v", toEmail, err)
 		return err
@@ -121,10 +121,7 @@ The Traceway Team
 	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\n\r\n%s",
 		e.from, toEmail, subject, body)
 
-	auth := smtp.PlainAuth("", e.username, e.password, e.host)
-	addr := fmt.Sprintf("%s:%d", e.host, e.port)
-
-	err := smtp.SendMail(addr, auth, e.from, []string{toEmail}, []byte(msg))
+	err := e.sendMail([]string{toEmail}, []byte(msg))
 	if err != nil {
 		config.Logf("Failed to send password reset email to %s: %v", toEmail, err)
 		return err
@@ -132,4 +129,46 @@ The Traceway Team
 
 	config.Logf("Password reset email sent to %s", toEmail)
 	return nil
+}
+
+func (e *emailService) sendMail(to []string, msg []byte) error {
+	addr := fmt.Sprintf("%s:%d", e.host, e.port)
+	auth := smtp.PlainAuth("", e.username, e.password, e.host)
+
+	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
+	if err != nil {
+		return fmt.Errorf("SMTP dial failed: %w", err)
+	}
+
+	client, err := smtp.NewClient(conn, e.host)
+	if err != nil {
+		conn.Close()
+		return fmt.Errorf("SMTP client failed: %w", err)
+	}
+	defer client.Close()
+
+	conn.SetDeadline(time.Now().Add(10 * time.Second))
+
+	if err := client.Auth(auth); err != nil {
+		return fmt.Errorf("SMTP auth failed: %w", err)
+	}
+	if err := client.Mail(e.from); err != nil {
+		return fmt.Errorf("SMTP MAIL failed: %w", err)
+	}
+	for _, r := range to {
+		if err := client.Rcpt(r); err != nil {
+			return fmt.Errorf("SMTP RCPT failed: %w", err)
+		}
+	}
+	w, err := client.Data()
+	if err != nil {
+		return fmt.Errorf("SMTP DATA failed: %w", err)
+	}
+	if _, err := w.Write(msg); err != nil {
+		return fmt.Errorf("SMTP write failed: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return fmt.Errorf("SMTP close data failed: %w", err)
+	}
+	return client.Quit()
 }

@@ -64,13 +64,20 @@ func (o otelController) ExportTraces(c *gin.Context) {
 		return
 	}
 
+	var exceptionHashes []string
+	for _, ex := range exceptions {
+		exceptionHashes = append(exceptionHashes, ex.ExceptionHash)
+	}
+
 	if project, exists := c.Get(middleware.ProjectContextKey); exists {
 		if p, ok := project.(*models.Project); ok && p.OrganizationId != nil {
 			hooks.BroadcastReport(hooks.ReportEvent{
-				OrganizationId: *p.OrganizationId,
-				EndpointCount:  len(endpoints),
-				ErrorCount:     len(exceptions),
-				TaskCount:      len(tasks),
+				OrganizationId:  *p.OrganizationId,
+				ProjectId:       projectId,
+				EndpointCount:   len(endpoints),
+				ErrorCount:      len(exceptions),
+				TaskCount:       len(tasks),
+				ExceptionHashes: exceptionHashes,
 			})
 		}
 	}

@@ -58,6 +58,14 @@ type createRuleRequest struct {
 	RuleType        string          `json:"ruleType"`
 	Config          json.RawMessage `json:"config"`
 	CooldownMinutes int             `json:"cooldownMinutes"`
+	Severity        string          `json:"severity"`
+}
+
+var validSeverities = map[string]bool{
+	"":         true,
+	"critical": true,
+	"warning":  true,
+	"info":     true,
 }
 
 func (ctrl *notificationRuleController) Create(ctx *gin.Context) {
@@ -84,6 +92,10 @@ func (ctrl *notificationRuleController) Create(ctx *gin.Context) {
 	}
 	if !validRuleTypes[req.RuleType] {
 		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Invalid rule type."})
+		return
+	}
+	if !validSeverities[req.Severity] {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Severity must be critical, warning, info, or empty for auto."})
 		return
 	}
 	if req.CooldownMinutes < 0 {
@@ -121,6 +133,7 @@ func (ctrl *notificationRuleController) Create(ctx *gin.Context) {
 		Config:          req.Config,
 		Enabled:         true,
 		CooldownMinutes: cooldown,
+		Severity:        req.Severity,
 		CreatedBy:       createdBy,
 		CreatedAt:       now,
 		UpdatedAt:       now,
@@ -169,6 +182,10 @@ func (ctrl *notificationRuleController) Update(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Invalid rule type."})
 		return
 	}
+	if !validSeverities[req.Severity] {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Severity must be critical, warning, info, or empty for auto."})
+		return
+	}
 
 	tx := middleware.GetTx(ctx)
 
@@ -202,6 +219,7 @@ func (ctrl *notificationRuleController) Update(ctx *gin.Context) {
 	existing.RuleType = req.RuleType
 	existing.Config = req.Config
 	existing.CooldownMinutes = cooldown
+	existing.Severity = req.Severity
 	existing.UpdatedAt = time.Now().UTC()
 
 	if err := repositories.NotificationRuleRepository.Update(tx, existing); err != nil {

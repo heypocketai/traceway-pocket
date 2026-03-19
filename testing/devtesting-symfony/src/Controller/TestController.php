@@ -16,6 +16,7 @@ class TestController
     #[Route('/test-ok', methods: ['GET'])]
     public function testOk(): JsonResponse
     {
+        usleep(random_int(0, 3000) * 1000);
         return new JsonResponse(['status' => 'ok']);
     }
 
@@ -29,13 +30,6 @@ class TestController
     public function testParam(string $param): JsonResponse
     {
         return new JsonResponse(['param' => $param]);
-    }
-
-    #[Route('/test-exception', methods: ['GET'])]
-    public function testException(): never
-    {
-        usleep(random_int(0, 2000) * 1000);
-        throw new \RuntimeException('Cool');
     }
 
     #[Route('/test-spans', methods: ['GET'])]
@@ -71,6 +65,14 @@ class TestController
 
         return new JsonResponse(['status' => 'ok', 'message' => 'Spans captured']);
     }
+
+    #[Route('/test-exception/best', methods: ['GET'])]
+    public function testExceptionTest(): never
+    {
+        usleep(random_int(0, 2000) * 1000);
+        throw new \RuntimeException('Damn nice');
+    }
+
 
     #[Route('/test-metrics', methods: ['GET'])]
     public function testMetrics(): JsonResponse

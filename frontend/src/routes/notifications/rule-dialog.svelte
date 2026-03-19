@@ -29,6 +29,7 @@
 		config: any;
 		enabled: boolean;
 		cooldownMinutes: number;
+		severity: string;
 		snoozedUntil: string | null;
 		channelName: string;
 		channelType: string;
@@ -48,8 +49,16 @@
 	let channelId = $state('');
 	let ruleType = $state('new_error');
 	let cooldownMinutes = $state(15);
+	let severity = $state('');
 	let loading = $state(false);
 	let error = $state('');
+
+	const severityOptions = [
+		{ value: '', label: 'Auto (default)' },
+		{ value: 'critical', label: 'Critical' },
+		{ value: 'warning', label: 'Warning' },
+		{ value: 'info', label: 'Info' }
+	];
 
 	let thresholdPercent = $state(5);
 	let lookbackMinutes = $state(5);
@@ -134,6 +143,7 @@
 		channelId = '';
 		ruleType = 'new_error';
 		cooldownMinutes = 15;
+		severity = '';
 		error = '';
 		thresholdPercent = 5;
 		lookbackMinutes = 5;
@@ -161,6 +171,7 @@
 		channelId = r.channelId.toString();
 		ruleType = r.ruleType;
 		cooldownMinutes = r.cooldownMinutes;
+		severity = r.severity || '';
 		const cfg = r.config || {};
 
 		switch (r.ruleType) {
@@ -282,7 +293,8 @@
 				name,
 				ruleType,
 				config: buildConfig(),
-				cooldownMinutes
+				cooldownMinutes,
+				severity
 			};
 
 			if (isEditing) {
@@ -745,6 +757,20 @@
 					bind:value={cooldownMinutes}
 					min="1"
 				/>
+			</div>
+
+			<div class="space-y-2">
+				<Label for="rule-severity">Severity</Label>
+				<Select.Root type="single" bind:value={severity}>
+					<Select.Trigger class="w-full">
+						{severityOptions.find((o) => o.value === severity)?.label || 'Auto (default)'}
+					</Select.Trigger>
+					<Select.Content>
+						{#each severityOptions as option}
+							<Select.Item value={option.value}>{option.label}</Select.Item>
+						{/each}
+					</Select.Content>
+				</Select.Root>
 			</div>
 
 			{#if error}

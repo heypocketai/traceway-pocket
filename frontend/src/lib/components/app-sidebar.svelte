@@ -41,7 +41,7 @@
 			title: 'Metrics',
 			stickyParams: ['preset', 'from', 'to']
 		},
-		{ Icon: Bell, href: '/notifications', title: 'Alerts', stickyParams: [] },
+		{ Icon: Bell, href: '/notifications', title: 'Alerts', stickyParams: ['preset', 'from', 'to'] },
 		{ Icon: Link2, href: '/connection', title: 'Connection', stickyParams: [] }
 	];
 

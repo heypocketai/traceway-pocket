@@ -16,7 +16,7 @@ type notificationRuleRepository struct{}
 func (r *notificationRuleRepository) FindByProjectWithChannel(tx *sql.Tx, projectId uuid.UUID) ([]*models.NotificationRuleWithChannel, error) {
 	return lit.SelectNamed[models.NotificationRuleWithChannel](
 		tx,
-		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
+		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.severity, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
 			c.name as channel_name, c.channel_type as channel_type
 		FROM notification_rules r
 		JOIN notification_channels c ON c.id = r.channel_id
@@ -29,7 +29,7 @@ func (r *notificationRuleRepository) FindByProjectWithChannel(tx *sql.Tx, projec
 func (r *notificationRuleRepository) FindById(tx *sql.Tx, id int) (*models.NotificationRule, error) {
 	return lit.SelectSingleNamed[models.NotificationRule](
 		tx,
-		"SELECT id, project_id, channel_id, name, rule_type, config, enabled, cooldown_minutes, snoozed_until, created_by, created_at, updated_at FROM notification_rules WHERE id = :id",
+		"SELECT id, project_id, channel_id, name, rule_type, config, enabled, cooldown_minutes, severity, snoozed_until, created_by, created_at, updated_at FROM notification_rules WHERE id = :id",
 		lit.P{"id": id},
 	)
 }
@@ -37,7 +37,7 @@ func (r *notificationRuleRepository) FindById(tx *sql.Tx, id int) (*models.Notif
 func (r *notificationRuleRepository) FindEnabledPolledRules(tx *sql.Tx) ([]*models.NotificationRuleWithChannel, error) {
 	return lit.Select[models.NotificationRuleWithChannel](
 		tx,
-		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
+		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.severity, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
 			c.name as channel_name, c.channel_type as channel_type
 		FROM notification_rules r
 		JOIN notification_channels c ON c.id = r.channel_id
@@ -49,7 +49,7 @@ func (r *notificationRuleRepository) FindEnabledPolledRules(tx *sql.Tx) ([]*mode
 func (r *notificationRuleRepository) FindEnabledEventRules(tx *sql.Tx, projectId uuid.UUID) ([]*models.NotificationRuleWithChannel, error) {
 	return lit.SelectNamed[models.NotificationRuleWithChannel](
 		tx,
-		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
+		`SELECT r.id, r.project_id, r.channel_id, r.name, r.rule_type, r.config, r.enabled, r.cooldown_minutes, r.severity, r.snoozed_until, r.created_by, r.created_at, r.updated_at,
 			c.name as channel_name, c.channel_type as channel_type
 		FROM notification_rules r
 		JOIN notification_channels c ON c.id = r.channel_id

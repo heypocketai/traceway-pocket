@@ -4,13 +4,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
 	traceway "go.tracewayapp.com"
 )
+
+func sanitizeForDB(s string) string {
+	s = strings.ReplaceAll(s, "\x00", "")
+	if !utf8.ValidString(s) {
+		s = strings.ToValidUTF8(s, "\uFFFD")
+	}
+	return s
+}
 
 func dispatch(rule *models.NotificationRuleWithChannel, msg Message) {
 	channel, dbErr := db.ExecuteTransaction(func(tx *sql.Tx) (*models.NotificationChannel, error) {
@@ -24,6 +35,7 @@ func dispatch(rule *models.NotificationRuleWithChannel, msg Message) {
 
 	adapter, err := NewAdapter(channel.ChannelType, channel.Config)
 	if err != nil {
+		log.Printf("[notif] dispatch: ruleId=%d adapter error: %v", rule.Id, err)
 		recordHistory(rule, msg, "failed", err.Error())
 		recordFiredNotification(rule, msg, "failed", err.Error())
 		return
@@ -34,15 +46,20 @@ func dispatch(rule *models.NotificationRuleWithChannel, msg Message) {
 
 	msg.RuleType = rule.RuleType
 	msg.RuleName = rule.Name
+	if rule.Severity != "" {
+		msg.Severity = Severity(rule.Severity)
+	}
 
 	err = adapter.Send(ctx, msg)
 	if err != nil {
+		log.Printf("[notif] dispatch: ruleId=%d send FAILED: %v", rule.Id, err)
 		recordHistory(rule, msg, "failed", err.Error())
 		recordFiredNotification(rule, msg, "failed", err.Error())
 		traceway.CaptureException(fmt.Errorf("notification dispatch failed (rule=%d, channel=%s): %w", rule.Id, rule.ChannelName, err))
 		return
 	}
 
+	log.Printf("[notif] dispatch: ruleId=%d sent successfully via %s", rule.Id, channel.ChannelType)
 	recordHistory(rule, msg, "sent", "")
 	recordFiredNotification(rule, msg, "sent", "")
 	cooldowns.recordFire(rule.Id)
@@ -58,10 +75,10 @@ func recordFiredNotification(rule *models.NotificationRuleWithChannel, msg Messa
 			ChannelType: rule.ChannelType,
 			ChannelName: rule.ChannelName,
 			Severity:    string(msg.Severity),
-			Subject:     msg.Subject,
-			Body:        msg.Body,
+			Subject:     sanitizeForDB(msg.Subject),
+			Body:        sanitizeForDB(msg.Body),
 			Status:      status,
-			ErrorMsg:    errorMsg,
+			ErrorMsg:    sanitizeForDB(errorMsg),
 			Endpoint:    msg.Endpoint,
 			FiredAt:     time.Now().UTC(),
 		})
@@ -88,17 +105,25 @@ func recordHistory(rule *models.NotificationRuleWithChannel, msg Message, status
 		RuleName:     rule.Name,
 		ChannelName:  rule.ChannelName,
 		Severity:     string(msg.Severity),
-		Subject:      msg.Subject,
-		Body:         msg.Body,
+		Subject:      sanitizeForDB(msg.Subject),
+		Body:         sanitizeForDB(msg.Body),
 		Status:       status,
 		ErrorMessage: errMsgPtr,
+		URL:          msg.URL,
 		CreatedAt:    time.Now().UTC(),
+	}
+
+	if errMsgPtr != nil {
+		sanitized := sanitizeForDB(*errMsgPtr)
+		errMsgPtr = &sanitized
+		history.ErrorMessage = errMsgPtr
 	}
 
 	_, dbErr := db.ExecuteTransaction(func(tx *sql.Tx) (int, error) {
 		return repositories.NotificationHistoryRepository.Create(tx, history)
 	})
 	if dbErr != nil {
+		log.Printf("[notif] recordHistory FAILED: ruleId=%d subject=%q err=%v", rule.Id, msg.Subject, dbErr)
 		traceway.CaptureException(fmt.Errorf("failed to record notification history: %w", dbErr))
 	}
 }
