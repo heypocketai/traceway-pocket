@@ -1,3 +1,5 @@
+//go:build pgch
+
 package migrations
 
 import (
@@ -8,7 +10,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tracewayapp/traceway/backend/app/chdb"
 	"github.com/tracewayapp/traceway/backend/app/config"
 	"github.com/tracewayapp/traceway/backend/app/db"
 
@@ -190,86 +191,18 @@ func runMigrationsSQLite(db *sql.DB) error {
 	return nil
 }
 
-func runMigrationsEmbeddedClickhouse(chDB *sql.DB) error {
-	_, err := chDB.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations_ch (
-		version String,
-		applied_at DateTime DEFAULT now()
-	) ENGINE = MergeTree() ORDER BY version`)
-	if err != nil {
-		return fmt.Errorf("failed to create schema_migrations_ch table: %w", err)
-	}
-
-	entries, err := migrationsChFS.ReadDir("ch")
-	if err != nil {
-		return fmt.Errorf("failed to read ch migrations dir: %w", err)
-	}
-
-	var files []string
-	for _, e := range entries {
-		if !e.IsDir() && strings.HasSuffix(e.Name(), ".up.sql") {
-			files = append(files, e.Name())
-		}
-	}
-	sort.Strings(files)
-
-	for _, file := range files {
-		version := strings.TrimSuffix(file, ".up.sql")
-
-		rows, err := chDB.Query("SELECT count() FROM schema_migrations_ch WHERE version = ?", version)
-		if err != nil {
-			return fmt.Errorf("failed to check migration version %s: %w", version, err)
-		}
-		var count int
-		if rows.Next() {
-			if err := rows.Scan(&count); err != nil {
-				rows.Close()
-				return fmt.Errorf("failed to scan migration count for %s: %w", version, err)
-			}
-		}
-		rows.Close()
-		if count > 0 {
-			continue
-		}
-
-		content, err := migrationsChFS.ReadFile("ch/" + file)
-		if err != nil {
-			return fmt.Errorf("failed to read migration file %s: %w", file, err)
-		}
-
-		stmt := strings.TrimSpace(string(content))
-		if stmt == "" {
-			continue
-		}
-		if _, err := chDB.Exec(stmt); err != nil {
-			return fmt.Errorf("failed to execute migration %s: %w", file, err)
-		}
-
-		if _, err := chDB.Exec("INSERT INTO schema_migrations_ch (version) VALUES (?)", version); err != nil {
-			return fmt.Errorf("failed to record migration version %s: %w", version, err)
-		}
-	}
-
-	return nil
-}
-
 func Run(dbType string) error {
 	cfg := config.Config
 
 	// Run ClickHouse migrations
-	if cfg.ClickhouseType == "embedded" {
-		if err := runMigrationsEmbeddedClickhouse(chdb.EmbeddedDB); err != nil {
-			return fmt.Errorf("embedded clickhouse migrations failed: %w", err)
-		}
-	} else {
-		tlsConfig := "&secure=true"
-		if cfg.ClickhouseTLS == "false" {
-			tlsConfig = ""
-		}
+	tlsConfig := "&secure=true"
+	if cfg.ClickhouseTLS == "false" {
+		tlsConfig = ""
+	}
 
-		err := runMigrationsClickhouse(fmt.Sprintf(`clickhouse://%s?username=%s&password=%s&database=%s%s`, cfg.ClickhouseServer, url.QueryEscape(cfg.ClickhouseUsername), url.QueryEscape(cfg.ClickhousePassword), cfg.ClickhouseDatabase, tlsConfig))
-		if err != nil {
-			return fmt.Errorf("clickhouse migrations failed: %w", err)
-		}
+	err := runMigrationsClickhouse(fmt.Sprintf(`clickhouse://%s?username=%s&password=%s&database=%s%s`, cfg.ClickhouseServer, url.QueryEscape(cfg.ClickhouseUsername), url.QueryEscape(cfg.ClickhousePassword), cfg.ClickhouseDatabase, tlsConfig))
+	if err != nil {
+		return fmt.Errorf("clickhouse migrations failed: %w", err)
 	}
 
 	if dbType == "sqlite" {

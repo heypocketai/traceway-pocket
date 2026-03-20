@@ -26,11 +26,6 @@ const (
 	serviceName   = "embedded-example"
 )
 
-// !! WARNING: The embedded backend ONLY works on Linux and macOS.
-// !! Windows is NOT supported due to embedded ClickHouse (chdb) limitations.
-// !!
-// !! ClickHouse MUST be installed on the system:
-// !!   curl -sL https://lib.chdb.io | bash
 func main() {
 	// 1: initialize traceway backend
 	go tracewaybackend.Run(
@@ -73,7 +68,7 @@ func main() {
 	fmt.Printf("  App:        http://localhost:%d/hello/world\n", appPort)
 	fmt.Printf("  Error:      http://localhost:%d/hello/error\n", appPort)
 	fmt.Println("  Dashboard:  http://localhost:8082")
-	fmt.Println("  Login:      admin@localhost / admin")
+	fmt.Println("  Login:      admin@localhost.com / admin")
 	fmt.Println("===========================================")
 	fmt.Println()
 

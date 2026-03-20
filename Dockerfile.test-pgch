@@ -1,0 +1,35 @@
+# ==============================================================================
+# Traceway pgch Test Image
+# Runs ClickHouse + PostgreSQL + Go tests in a single container
+# ==============================================================================
+
+FROM golang:1.25-bookworm
+
+# Install PostgreSQL + ClickHouse
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql \
+    postgresql-client \
+    sudo \
+    ca-certificates \
+    curl \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ClickHouse
+RUN curl -fsSL https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key | gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" > /etc/apt/sources.list.d/clickhouse.list \
+    && apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends clickhouse-server clickhouse-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy backend source
+WORKDIR /app/backend
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+COPY backend/ ./
+
+# Copy the entrypoint
+COPY scripts/test-pgch-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

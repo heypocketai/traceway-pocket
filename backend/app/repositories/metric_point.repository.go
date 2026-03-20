@@ -1,3 +1,5 @@
+//go:build pgch
+
 package repositories
 
 import (

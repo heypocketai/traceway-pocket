@@ -1,0 +1,57 @@
+# Build Tags
+
+The Traceway backend uses Go build tags to switch between storage backends and to embed the frontend.
+
+## Tags
+
+| Tag | Purpose |
+|-----|---------|
+| *(none)* | **SQLite** storage — embedded mode, zero external dependencies. This is the default. |
+| `pgch` | **ClickHouse + PostgreSQL** storage — standalone server mode. |
+| `localdist` | Embeds frontend from `static/dist/` instead of `static/frontend/`. Used by traceway-cloud to inject billing UI into the frontend build. Not needed for open-source builds. |
+
+## Building
+
+### Embedded mode (SQLite)
+
+No tags needed — a plain `go build` gives you the embedded SQLite backend:
+
+```bash
+cd backend && go build ./cmd/traceway
+```
+
+This is what library consumers get when they `go get github.com/tracewayapp/traceway/backend` and call `tracewaybackend.Run()`.
+
+### Standalone server (ClickHouse + PostgreSQL)
+
+```bash
+cd backend && go build -tags pgch ./cmd/traceway
+```
+
+Requires `CLICKHOUSE_SERVER`, `POSTGRES_HOST`, and the other environment variables to be configured.
+
+### Docker image
+
+The Dockerfiles build the frontend and embed it into the Go binary with the `pgch` tag:
+
+```bash
+go build -tags pgch ./cmd/traceway
+```
+
+The frontend is embedded from `static/frontend/` which the Docker build populates from the SvelteKit build output. You don't need to embed the frontend for local development — run the frontend dev server separately with `cd frontend && npm run dev`.
+
+## Running Tests
+
+### SQLite tests (default)
+
+```bash
+cd backend && go test -v -count=1 ./app/repositories/
+```
+
+### ClickHouse tests
+
+```bash
+cd backend && TEST_CLICKHOUSE_SERVER=localhost:9000 go test -tags pgch -v ./app/repositories/
+```
+
+Without `TEST_CLICKHOUSE_SERVER` set, the `pgch` tests skip cleanly.

@@ -1,15 +1,8 @@
 # Embedded Mode
 
-import { Callout } from "nextra/components";
+import { Callout, Steps } from "nextra/components";
 
-<Callout type="warning">
-  **Linux and macOS only.** Embedded mode uses
-  [chdb](https://github.com/chdb-io/chdb) (embedded ClickHouse), which does
-  **not** support Windows. If you're on Windows, use the [Docker
-  Compose](/server/docker-compose) deployment instead.
-</Callout>
-
-Embedded mode runs a full Traceway server inside your Go process — using **SQLite** instead of PostgreSQL and **embedded ClickHouse** (via [chdb](https://github.com/chdb-io/chdb)) instead of an external server. No Docker, no infrastructure — just one `tracewaybackend.Run()` call and your app has local observability.
+Embedded mode runs a full Traceway server inside your Go process — using **SQLite** for all storage (relational data and telemetry). No Docker, no infrastructure — just one `tracewaybackend.Run()` call and your app has local observability.
 
 This is intended for **local development only**. For production, use the [Docker Compose](/server/docker-compose) or [minimal](/server/minimal) deployment.
 
@@ -20,212 +13,108 @@ This is intended for **local development only**. For production, use the [Docker
   you can run in one command.
 </Callout>
 
-## Prerequisites
-
-Install `libchdb` (the embedded ClickHouse C library). Supports macOS and Linux:
-
-```bash
-curl -sL https://lib.chdb.io | bash
-```
-
-Embedded ClickHouse is included by default in all builds. To exclude it (e.g., for production Docker images using an external ClickHouse), build with the `nochdb` tag:
-
-```bash
-go build -tags nochdb ./...
-```
-
 ## Quick Start
 
-Add the Traceway server module to your project:
+<Steps>
+
+### Install the Traceway backend module
 
 ```bash
 go get github.com/tracewayapp/traceway/backend
 ```
 
-Then call `tracewaybackend.Run()` somewhere in your application startup. A common pattern is guarding it behind an environment check so it only runs in development:
+### Start Traceway inside your app
+
+Call `tracewaybackend.Run()` in a goroutine during startup. It boots an in-memory SQLite server and seeds a default user and project:
 
 ```go
 package main
 
 import (
-	"os"
-
 	"github.com/gin-gonic/gin"
 	tracewaybackend "github.com/tracewayapp/traceway/backend"
-	tracewaygin "go.tracewayapp.com/tracewaygin"
 )
 
 func main() {
-	if os.Getenv("ENV") != "production" {
-		go tracewaybackend.Run(
-			tracewaybackend.WithPort(8085),
-			tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
-			tracewaybackend.WithDefaultProject("Backend", "go", "backend-dev-token"),
-			tracewaybackend.WithDefaultProject("Frontend", "sveltekit", "frontend-dev-token"),
-		)
-	}
+	go tracewaybackend.Run(
+		tracewaybackend.WithPort(8082),
+		tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
+		tracewaybackend.WithDefaultProject("My App", "go", "dev-token"),
+	)
 
 	router := gin.Default()
-	router.Use(tracewaygin.New(
-		"backend-dev-token@http://localhost:8085/api/report",
-		tracewaygin.WithOnErrorRecording(
-				tracewaygin.RecordingUrl | tracewaygin.RecordingQuery,
-		),
-	))
-
-	router.GET("/ping", func(c *gin.Context) {
-		c.String(200, "pong")
-	})
-	router.Run(":3000")
+	// ... your routes
+	router.Run(":8080")
 }
 ```
 
-`WithDefaultProject` can be called multiple times to create separate projects — one for your Go backend, another for a frontend or any other service. Each project gets its own token, keeping telemetry organized in the dashboard.
+### Point OpenTelemetry to your local Traceway
 
-Run the application:
+Install the OTel dependencies:
 
 ```bash
-go run .
+go get go.opentelemetry.io/otel \
+       go.opentelemetry.io/otel/sdk \
+       go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp \
+       go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin
 ```
 
-The Traceway dashboard is available at `http://localhost:8085`. Log in with the credentials from `WithDefaultUser`.
-
-## Configuration Options
-
-All options are passed to `tracewaybackend.Run()`. When any options are provided, embedded mode is activated automatically (SQLite + embedded ClickHouse).
-
-| Option                                       | Description                                                                | Default                   |
-| -------------------------------------------- | -------------------------------------------------------------------------- | ------------------------- |
-| `WithPort(port)`                             | HTTP port for the Traceway server                                          | `8082`                    |
-| `WithServerURL(url)`                         | Base URL override (used in connection string output)                       | `http://localhost:{port}` |
-| `WithSQLitePath(path)`                       | SQLite database file path                                                  | `:memory:` (in-memory)    |
-| `WithClickhousePath(path)`                   | ClickHouse data directory                                                  | `""` (in-memory)          |
-| `WithDefaultUser(email, password)`           | Create a default admin user on startup                                     | None                      |
-| `WithDefaultProject(name, framework, token)` | Create a default project with a fixed token (can be called multiple times) | None                      |
-
-## Data Persistence
-
-By default, both databases are **in-memory** — all data is lost when your application restarts. This is fine for quick debugging sessions, but if you want data to survive restarts, set file paths:
-
-```go
-tracewaybackend.Run(
-	tracewaybackend.WithSQLitePath("./traceway.db"),
-	tracewaybackend.WithClickhousePath("./chdb-data"),
-	tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
-	tracewaybackend.WithDefaultProject("Backend", "go", "backend-dev-token"),
-	tracewaybackend.WithDefaultProject("Frontend", "sveltekit", "frontend-dev-token"),
-)
-```
-
-- `WithSQLitePath` stores users, projects, and organizations in a local SQLite file.
-- `WithClickhousePath` stores traces, issues, and metrics in a local directory.
-
-Seeding is idempotent — if the user from `WithDefaultUser` already exists, it's skipped.
-
-## Connecting Your App
-
-## Open Telemetry Full Example
-
-The example below shows a complete Go application with Traceway running inside the same process. The embedded server starts in a goroutine, OpenTelemetry sends traces to it over localhost, and you get a full dashboard — all from a single `go run .`.
-
-> [View the full example on GitHub →](https://github.com/tracewayapp/traceway/tree/main/examples/embedded-backend-otel)
+Configure the OTLP exporter to send traces to the embedded server, and add the OTel middleware to your router:
 
 ```go
 package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"math/rand/v2"
-	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	tracewaybackend "github.com/tracewayapp/traceway/backend"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
-	"go.opentelemetry.io/otel/trace"
 )
 
-const (
-	appPort       = 8080
-	tracewayToken = "backend-dev-token"
-	serviceName   = "embedded-example"
-)
+const tracewayToken = "dev-token"
 
 func main() {
-	// Start the embedded Traceway server in the background.
-	// It runs on port 8082 and seeds a default admin user and project.
 	go tracewaybackend.Run(
 		tracewaybackend.WithPort(8082),
 		tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
-		tracewaybackend.WithDefaultProject("Example App", "go", tracewayToken),
-		tracewaybackend.DisableLogging(),
+		tracewaybackend.WithDefaultProject("My App", "go", tracewayToken),
 	)
 
-	// Set up OpenTelemetry to export traces to the embedded server.
 	shutdown := initTracer()
 	defer shutdown()
 
 	router := gin.Default()
-	router.Use(otelgin.Middleware(serviceName))
+	router.Use(otelgin.Middleware("my-app"))
 
-	router.GET("/hello/:name", func(c *gin.Context) {
-		name := c.Param("name")
-		tracer := otel.Tracer(serviceName)
-
-		// Create a child span to simulate a database lookup.
-		_, span := tracer.Start(c.Request.Context(), "db.lookup")
-		time.Sleep(time.Duration(20+rand.IntN(80)) * time.Millisecond)
-		span.End()
-
-		// Passing "error" as the name triggers an error for testing.
-		if name == "error" {
-			err := errors.New("something went wrong")
-			rootSpan := trace.SpanFromContext(c.Request.Context())
-			rootSpan.RecordError(err, trace.WithStackTrace(true))
-			rootSpan.SetStatus(codes.Error, err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{"message": "Hello, " + name + "!"})
+	router.GET("/ping", func(c *gin.Context) {
+		c.String(200, "pong")
 	})
-
-	router.Run(fmt.Sprintf(":%d", appPort))
+	router.Run(":8080")
 }
 
 func initTracer() func() {
-	exporter, err := otlptracehttp.New(
+	exporter, _ := otlptracehttp.New(
 		context.Background(),
 		otlptracehttp.WithEndpointURL("http://localhost:8082/api/otel/v1/traces"),
 		otlptracehttp.WithHeaders(map[string]string{
 			"Authorization": "Bearer " + tracewayToken,
 		}),
 	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create OTLP exporter: %v", err))
-	}
-
-	res, err := resource.New(
-		context.Background(),
-		resource.WithAttributes(
-			semconv.ServiceName(serviceName),
-		),
-	)
-	if err != nil {
-		panic(fmt.Sprintf("failed to create resource: %v", err))
-	}
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(res),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceName("my-app"),
+		)),
 	)
 	otel.SetTracerProvider(tp)
 
@@ -237,11 +126,75 @@ func initTracer() func() {
 }
 ```
 
-Run it:
+The key parts:
+- **Exporter URL** points to `http://localhost:8082/api/otel/v1/traces` — the embedded server's OTLP endpoint
+- **Authorization header** uses the same token from `WithDefaultProject`
 
-```bash
-curl -sL https://lib.chdb.io | bash   # one-time: install embedded ClickHouse
-go run .
+### Open the dashboard
+
+Run your app, then open **[http://localhost:8082](http://localhost:8082)** in your browser.
+
+Log in with the credentials from `WithDefaultUser` (`admin@localhost.com` / `admin`).
+
+Hit your app at `http://localhost:8080/ping` a few times — traces will appear in the Traceway dashboard within a few seconds.
+
+</Steps>
+
+## Configuration Options
+
+All options are passed to `tracewaybackend.Run()`. When any options are provided, embedded mode is activated automatically (pure SQLite).
+
+| Option                                       | Description                                                                | Default                   |
+| -------------------------------------------- | -------------------------------------------------------------------------- | ------------------------- |
+| `WithPort(port)`                             | HTTP port for the Traceway server                                          | `8082`                    |
+| `WithServerURL(url)`                         | Base URL override (used in connection string output)                       | `http://localhost:{port}` |
+| `WithSQLitePath(path)`                       | SQLite database file path                                                  | `:memory:` (in-memory)    |
+| `WithDefaultUser(email, password)`           | Create a default admin user on startup                                     | None                      |
+| `WithDefaultProject(name, framework, token)` | Create a default project with a fixed token (can be called multiple times) | None                      |
+
+## Multiple Projects
+
+`WithDefaultProject` can be called multiple times to create separate projects — one for your Go backend, another for a frontend or any other service. Each project gets its own token, keeping telemetry organized in the dashboard:
+
+```go
+go tracewaybackend.Run(
+	tracewaybackend.WithPort(8082),
+	tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
+	tracewaybackend.WithDefaultProject("Backend", "go", "backend-token"),
+	tracewaybackend.WithDefaultProject("Frontend", "sveltekit", "frontend-token"),
+)
 ```
 
-Then open `http://localhost:8082`, log in with **admin@localhost.com / admin**, and hit `http://localhost:8080/hello/world` a few times to see traces appear in the dashboard.
+## Data Persistence
+
+By default, the database is **in-memory** — all data is lost when your application restarts. This is fine for quick debugging sessions, but if you want data to survive restarts, set a file path:
+
+```go
+tracewaybackend.Run(
+	tracewaybackend.WithSQLitePath("./traceway.db"),
+	tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
+	tracewaybackend.WithDefaultProject("My App", "go", "dev-token"),
+)
+```
+
+`WithSQLitePath` stores everything — users, projects, traces, issues, and metrics — in a single SQLite file.
+
+Seeding is idempotent — if the user from `WithDefaultUser` already exists, it's skipped.
+
+## Development-Only Guard
+
+A common pattern is guarding embedded mode behind an environment check so it only runs in development:
+
+```go
+if os.Getenv("ENV") != "production" {
+	go tracewaybackend.Run(
+		tracewaybackend.WithPort(8082),
+		tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
+		tracewaybackend.WithDefaultProject("My App", "go", "dev-token"),
+	)
+}
+```
+
+## Full Example
+
+For a complete working example with error recording and child spans, see the [embedded-backend-otel example on GitHub](https://github.com/tracewayapp/traceway/tree/main/examples/embedded-backend-otel).
