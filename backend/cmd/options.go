@@ -2,7 +2,6 @@ package cmd
 
 type options struct {
 	sqlitePath      string
-	clickhousePath  string
 	port            int
 	serverURL       string
 	disableLogging  bool
@@ -26,12 +25,6 @@ type Option func(*options)
 func WithSQLitePath(path string) Option {
 	return func(o *options) {
 		o.sqlitePath = path
-	}
-}
-
-func WithClickhousePath(path string) Option {
-	return func(o *options) {
-		o.clickhousePath = path
 	}
 }
 

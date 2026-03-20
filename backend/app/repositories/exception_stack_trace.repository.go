@@ -1,3 +1,5 @@
+//go:build pgch
+
 package repositories
 
 import (
@@ -304,7 +306,8 @@ func (e *exceptionStackTraceRepository) UnarchiveByHashes(ctx context.Context, p
 	}
 
 	// In ClickHouse, we use ALTER TABLE DELETE for removing rows
-	query := "ALTER TABLE archived_exceptions DELETE WHERE project_id = ? AND exception_hash IN (?)"
+	// mutations_sync = 1 ensures the mutation completes before returning
+	query := "ALTER TABLE archived_exceptions DELETE WHERE project_id = ? AND exception_hash IN (?) SETTINGS mutations_sync = 1"
 	return chdb.Conn.Exec(ctx, query, projectId, hashes)
 }
 

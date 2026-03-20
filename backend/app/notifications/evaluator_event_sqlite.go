@@ -1,15 +1,16 @@
-//go:build pgch
+//go:build !pgch
 
 package notifications
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tracewayapp/traceway/backend/app/chdb"
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/hooks"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	traceway "go.tracewayapp.com"
@@ -25,31 +26,28 @@ func evaluateNewError(ctx context.Context, rule *models.NotificationRuleWithChan
 			continue
 		}
 
-		var count uint64
-		err := chdb.Conn.QueryRow(ctx,
-			"SELECT count() FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ?",
-			event.ProjectId, hash).Scan(&count)
+		var count int64
+		err := db.DB.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ?",
+			event.ProjectId.String(), hash).Scan(&count)
 		if err != nil {
 			traceway.CaptureException(fmt.Errorf("new_error check failed: %w", err))
 			continue
 		}
 
-		// count > 1 means this hash already existed before this batch
 		if count > 1 {
-			// Check if this hash was archived (resolved) — if so, a re-occurrence should be treated as new
-			var archivedCount uint64
-			archErr := chdb.Conn.QueryRow(ctx,
-				"SELECT count() FROM archived_exceptions FINAL WHERE project_id = ? AND exception_hash = ?",
-				event.ProjectId, hash).Scan(&archivedCount)
+			var archivedCount int64
+			archErr := db.DB.QueryRowContext(ctx,
+				"SELECT COUNT(*) FROM archived_exceptions WHERE project_id = ? AND exception_hash = ?",
+				event.ProjectId.String(), hash).Scan(&archivedCount)
 			if archErr != nil || archivedCount == 0 {
 				continue
 			}
 
-			// Archived — only fire if this is the first re-occurrence after archiving
-			var postArchiveCount uint64
-			archErr = chdb.Conn.QueryRow(ctx,
-				"SELECT count() FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? AND recorded_at > (SELECT max(archived_at) FROM archived_exceptions FINAL WHERE project_id = ? AND exception_hash = ?)",
-				event.ProjectId, hash, event.ProjectId, hash).Scan(&postArchiveCount)
+			var postArchiveCount int64
+			archErr = db.DB.QueryRowContext(ctx,
+				"SELECT COUNT(*) FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? AND recorded_at > (SELECT MAX(archived_at) FROM archived_exceptions WHERE project_id = ? AND exception_hash = ?)",
+				event.ProjectId.String(), hash, event.ProjectId.String(), hash).Scan(&postArchiveCount)
 			if archErr != nil {
 				traceway.CaptureException(fmt.Errorf("new_error post-archive count failed: %w", archErr))
 				continue
@@ -80,11 +78,10 @@ func evaluateErrorRegression(ctx context.Context, rule *models.NotificationRuleW
 			continue
 		}
 
-		// Check if this hash was previously archived (resolved)
-		var count uint64
-		err := chdb.Conn.QueryRow(ctx,
-			"SELECT count() FROM archived_exceptions FINAL WHERE project_id = ? AND exception_hash = ?",
-			event.ProjectId, hash).Scan(&count)
+		var count int64
+		err := db.DB.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM archived_exceptions WHERE project_id = ? AND exception_hash = ?",
+			event.ProjectId.String(), hash).Scan(&count)
 		if err != nil {
 			traceway.CaptureException(fmt.Errorf("error_regression check failed: %w", err))
 			continue
@@ -103,28 +100,30 @@ func evaluateErrorRegression(ctx context.Context, rule *models.NotificationRuleW
 }
 
 func getExceptionDetails(ctx context.Context, projectId uuid.UUID, hash string) ExceptionDetails {
-	var id uuid.UUID
-	var stackTrace, appVersion, serverName, attributesJSON string
-	var recordedAt time.Time
+	var idStr, stackTrace, appVersion, serverName, attributesJSON, recordedAtStr string
 
-	err := chdb.Conn.QueryRow(ctx,
+	err := db.DB.QueryRowContext(ctx,
 		"SELECT id, stack_trace, attributes, app_version, server_name, recorded_at FROM exception_stack_traces WHERE project_id = ? AND exception_hash = ? ORDER BY recorded_at DESC LIMIT 1",
-		projectId, hash).Scan(&id, &stackTrace, &attributesJSON, &appVersion, &serverName, &recordedAt)
+		projectId.String(), hash).Scan(&idStr, &stackTrace, &attributesJSON, &appVersion, &serverName, &recordedAtStr)
 
 	details := ExceptionDetails{
 		Hash: hash,
 	}
 
 	if err != nil {
+		if err == sql.ErrNoRows {
+			details.ErrorType = "Unknown Error"
+			return details
+		}
 		details.ErrorType = "Unknown Error"
 		return details
 	}
 
-	details.Id = id.String()
+	details.Id = idStr
 	details.StackTrace = stackTrace
 	details.AppVersion = appVersion
 	details.ServerName = serverName
-	details.RecordedAt = recordedAt
+	details.RecordedAt, _ = time.Parse(time.RFC3339Nano, recordedAtStr)
 
 	if attributesJSON != "" && attributesJSON != "{}" {
 		attrs := make(map[string]string)

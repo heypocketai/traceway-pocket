@@ -45,15 +45,13 @@ func Run(opts ...Option) {
 			port = 8082
 		}
 		cfg = &config.Cfg{
-			JWTSecret:      "traceway-dev-secret-key-min-32-chars!",
-			DBType:         "sqlite",
-			SQLitePath:     o.sqlitePath,
-			ClickhouseType: "embedded",
-			ClickhousePath: o.clickhousePath,
-			StorageType:    "local",
-			StoragePath:    "./storage",
-			APIOnly:        "false",
-			Ports:          fmt.Sprintf("%d", port),
+			JWTSecret:   "traceway-dev-secret-key-min-32-chars!",
+			DBType:      "sqlite",
+			SQLitePath:  o.sqlitePath,
+			StorageType: "local",
+			StoragePath: "./storage",
+			APIOnly:     "false",
+			Ports:       fmt.Sprintf("%d", port),
 		}
 		if o.serverURL == "" {
 			o.serverURL = fmt.Sprintf("http://localhost:%d", port)

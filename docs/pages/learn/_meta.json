@@ -7,5 +7,7 @@
   "spans": "Spans",
   "metrics": "Metrics",
   "alerts": "Alerts",
-  "embedded-mode": "Embedded Mode"
+  "embedded-mode": "Embedded Mode",
+  "build-tags": "Build Tags",
+  "contributing": "Contributing"
 }

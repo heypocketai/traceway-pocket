@@ -1,0 +1,249 @@
+# Contributing
+
+import { Callout } from "nextra/components";
+
+This guide covers how to set up the Traceway development environment, run tests, and submit changes.
+
+## Project Structure
+
+| Directory | Description |
+|-----------|-------------|
+| `backend/` | Go/Gin API server — handles telemetry ingestion, REST API, and database access |
+| `frontend/` | SvelteKit 2 dashboard — the web UI users interact with |
+| `docs/` | Nextra documentation site (what you're reading now) |
+| `examples/` | Working example apps demonstrating embedded mode |
+| `scripts/` | Helper scripts for testing and CI |
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Backend | Go 1.25, Gin, ClickHouse, PostgreSQL |
+| Frontend | SvelteKit 2, Svelte 5, Tailwind CSS v4, shadcn-svelte |
+| Embedded mode | SQLite (default build, no external dependencies) |
+| Docs | Nextra (Next.js) |
+
+## Prerequisites
+
+- **Go** 1.25 or later
+- **Node.js** 18+ and npm
+- **Docker** (for running the full pgch test suite)
+- **ClickHouse** and **PostgreSQL** (only if running the standalone server locally — not needed for embedded/SQLite mode)
+
+## Build Tags
+
+Traceway uses Go build tags to switch between storage backends:
+
+| Tag | Purpose |
+|-----|---------|
+| *(none)* | **SQLite** — embedded mode, zero dependencies. This is the default. |
+| `pgch` | **ClickHouse + PostgreSQL** — standalone server mode. |
+| `localdist` | Embeds the pre-built frontend into the Go binary. Used in Docker builds. |
+
+See the [Build Tags](/learn/build-tags) page for more details.
+
+## Setting Up for Development
+
+### Backend (embedded/SQLite mode)
+
+The fastest way to get going — no databases to install:
+
+```bash
+cd backend
+go build ./...
+go test ./...
+```
+
+This builds and tests the SQLite backend, which is the default.
+
+### Backend (standalone server mode)
+
+If you're working on ClickHouse or PostgreSQL-specific code, see the [Local Setup](/server/local-setup) guide for database installation and environment variables. Then:
+
+```bash
+cd backend
+go build -tags pgch ./...
+go run -tags pgch ./cmd/traceway
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The dev server runs on port **5173** and proxies API requests to the backend on port **8082**.
+
+### Docs
+
+```bash
+cd docs
+npm install
+npm run dev
+```
+
+## Running Tests
+
+### SQLite tests (default)
+
+These run without any external dependencies:
+
+```bash
+cd backend
+go test -v -count=1 ./app/repositories/
+```
+
+### ClickHouse + PostgreSQL tests (via Docker)
+
+The full pgch test suite runs ClickHouse and PostgreSQL inside a Docker container. This is the most reliable way to verify ClickHouse-specific code:
+
+```bash
+./scripts/test-backend-pgch.sh
+```
+
+This builds a Docker image with both databases, applies all migrations, and runs the test suite with `-tags pgch`. All tests should pass.
+
+<Callout type="info">
+  Without Docker, you can run pgch tests against local databases by setting environment variables:
+
+  ```bash
+  cd backend
+  TEST_CLICKHOUSE_SERVER=localhost:9000 \
+  TEST_CLICKHOUSE_DATABASE=traceway_test \
+  TEST_POSTGRES_HOST=localhost \
+  TEST_POSTGRES_DATABASE=traceway_test \
+  TEST_POSTGRES_USERNAME=traceway \
+  TEST_POSTGRES_PASSWORD=traceway \
+  go test -tags pgch -v -count=1 ./app/repositories/
+  ```
+
+  Without `TEST_CLICKHOUSE_SERVER` set, the pgch tests skip cleanly.
+</Callout>
+
+### Frontend checks
+
+```bash
+cd frontend
+npm run check    # TypeScript checking
+npm run build    # Production build
+```
+
+## Architecture Overview
+
+### Data Flow
+
+```
+Application → [SDK] → POST /api/report → Backend → ClickHouse/SQLite
+                                            ↓
+Dashboard ← [SvelteKit Frontend] ← JSON API ← Gin Controllers
+```
+
+The SDK sends telemetry (traces, exceptions, metrics) as gzipped JSON to the backend. The backend stores it in ClickHouse (standalone) or SQLite (embedded), and the frontend reads it via REST API.
+
+### Authentication
+
+Two separate auth systems:
+
+- **Client auth**: Project bearer tokens — used by the SDK to send telemetry (`Authorization: Bearer <project_token>`)
+- **App auth**: JWT tokens — used by the dashboard for user sessions (`Authorization: Bearer <jwt_token>`)
+
+### Database Split
+
+- **PostgreSQL** (or SQLite in embedded mode): Relational data that gets updated — users, organizations, projects, invitations, notification rules, widget config
+- **ClickHouse** (or SQLite in embedded mode): High-volume append-only telemetry — traces, exceptions, metrics, spans, tasks, session recordings
+
+### Backend Patterns
+
+**Repositories** are singletons (`var FooRepository = fooRepository{}`). Each repository has two implementations in separate files — one for ClickHouse/PostgreSQL (`//go:build pgch`) and one for SQLite (`//go:build !pgch`).
+
+**Controllers** use the Gin framework. PostgreSQL operations go through `middleware.Transactional` for automatic commit/rollback.
+
+**Migrations** live in `backend/app/migrations/ch/` (ClickHouse) and `backend/app/migrations/pg/` (PostgreSQL). Each ClickHouse migration file must contain exactly one SQL statement. Migrations run automatically on startup.
+
+### Frontend Patterns
+
+**State** is managed with Svelte 5 runes (`$state`, `$derived`, `$effect`) in singleton classes exported from `src/lib/state/`.
+
+**API calls** go through `src/lib/api.ts` which auto-attaches auth tokens and the current project ID.
+
+**Components** use shadcn-svelte (in `src/lib/components/ui/`) with custom Traceway wrappers (in `src/lib/components/traceway/`).
+
+## Forking and Opening PRs
+
+### Fork and clone
+
+1. Fork the repository on GitHub
+2. Clone your fork:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/traceway.git
+cd traceway
+```
+
+3. Add the upstream remote:
+
+```bash
+git remote add upstream https://github.com/tracewayapp/traceway.git
+```
+
+### Create a branch
+
+Always branch from `main`:
+
+```bash
+git fetch upstream
+git checkout -b your-feature upstream/main
+```
+
+### Before submitting
+
+1. **Build both backends** to make sure nothing is broken:
+
+```bash
+cd backend
+go build ./...              # SQLite (default)
+go build -tags pgch ./...   # ClickHouse + PostgreSQL
+```
+
+2. **Run the SQLite tests**:
+
+```bash
+go test -v -count=1 ./app/repositories/
+```
+
+3. **Run the pgch Docker tests** if you changed any repository code:
+
+```bash
+./scripts/test-backend-pgch.sh
+```
+
+4. **Check the frontend** if you changed any frontend code:
+
+```bash
+cd frontend
+npm run check
+npm run build
+```
+
+### Open a pull request
+
+Push your branch and open a PR against `main`:
+
+```bash
+git push origin your-feature
+```
+
+Then create a pull request on GitHub. Include:
+
+- A short description of what the change does and why
+- Steps to test, if applicable
+- Screenshots for UI changes
+
+### Keeping your fork up to date
+
+```bash
+git fetch upstream
+git rebase upstream/main
+```

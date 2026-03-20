@@ -14,13 +14,11 @@ type Cfg struct {
 	PostgresSSLMode  string
 	SQLitePath       string
 
-	ClickhouseType     string
 	ClickhouseServer   string
 	ClickhouseDatabase string
 	ClickhouseUsername string
 	ClickhousePassword string
 	ClickhouseTLS      string
-	ClickhousePath     string
 
 	StorageType string
 	StoragePath string
@@ -62,13 +60,11 @@ func LoadFromEnv() *Cfg {
 		PostgresSSLMode:  os.Getenv("POSTGRES_SSLMODE"),
 		SQLitePath:       os.Getenv("SQLITE_PATH"),
 
-		ClickhouseType:     os.Getenv("CLICKHOUSE_TYPE"),
 		ClickhouseServer:   os.Getenv("CLICKHOUSE_SERVER"),
 		ClickhouseDatabase: os.Getenv("CLICKHOUSE_DATABASE"),
 		ClickhouseUsername: os.Getenv("CLICKHOUSE_USERNAME"),
 		ClickhousePassword: os.Getenv("CLICKHOUSE_PASSWORD"),
 		ClickhouseTLS:      os.Getenv("CLICKHOUSE_TLS"),
-		ClickhousePath:     os.Getenv("CLICKHOUSE_PATH"),
 
 		StorageType: os.Getenv("STORAGE_TYPE"),
 		StoragePath: os.Getenv("STORAGE_PATH"),

@@ -18,11 +18,6 @@ const (
 	tracewayToken = "backend-dev-token"
 )
 
-// !! WARNING: The embedded backend ONLY works on Linux and macOS.
-// !! Windows is NOT supported due to embedded ClickHouse (chdb) limitations.
-// !!
-// !! ClickHouse MUST be installed on the system:
-// !!   curl -sL https://lib.chdb.io | bash
 func main() {
 	// 1: initialize traceway backend
 	go tracewaybackend.Run(

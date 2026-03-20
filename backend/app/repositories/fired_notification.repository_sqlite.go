@@ -1,4 +1,4 @@
-//go:build pgch
+//go:build !pgch
 
 package repositories
 
@@ -6,9 +6,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
-	"github.com/tracewayapp/traceway/backend/app/chdb"
+	"github.com/tracewayapp/traceway/backend/app/db"
 )
 
 type FiredNotification struct {
@@ -30,21 +29,14 @@ type FiredNotification struct {
 type firedNotificationRepository struct{}
 
 func (r *firedNotificationRepository) Insert(ctx context.Context, n FiredNotification) error {
-	batch, err := chdb.Conn.PrepareBatch(
-		clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
-		"INSERT INTO fired_notifications (project_id, rule_id, rule_type, rule_name, channel_type, channel_name, severity, subject, body, status, error_message, endpoint, fired_at)",
-	)
-	if err != nil {
-		return err
-	}
-	if err := batch.Append(
-		n.ProjectId, int32(n.RuleId), n.RuleType, n.RuleName,
+	_, err := db.DB.ExecContext(ctx,
+		`INSERT INTO fired_notifications (project_id, rule_id, rule_type, rule_name, channel_type, channel_name, severity, subject, body, status, error_message, endpoint, fired_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		n.ProjectId.String(), n.RuleId, n.RuleType, n.RuleName,
 		n.ChannelType, n.ChannelName, n.Severity, n.Subject, n.Body,
-		n.Status, n.ErrorMsg, n.Endpoint, n.FiredAt,
-	); err != nil {
-		return err
-	}
-	return batch.Send()
+		n.Status, n.ErrorMsg, n.Endpoint, n.FiredAt.UTC().Format(time.RFC3339Nano),
+	)
+	return err
 }
 
 var FiredNotificationRepository = firedNotificationRepository{}

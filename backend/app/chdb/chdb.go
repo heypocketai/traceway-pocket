@@ -1,10 +1,11 @@
+//go:build pgch
+
 package chdb
 
 import (
 	"github.com/tracewayapp/traceway/backend/app/config"
 	"context"
 	"crypto/tls"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -21,12 +22,8 @@ type ChConn interface {
 }
 
 var Conn ChConn
-var EmbeddedDB *sql.DB
 
 func Init() error {
-	if config.Config.ClickhouseType == "embedded" {
-		return initEmbedded()
-	}
 	return initExternal()
 }
 
