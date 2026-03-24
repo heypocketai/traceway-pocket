@@ -22,6 +22,15 @@ func (r *metricRegistryRepository) EnsureRegistered(tx *sql.Tx, projectId uuid.U
 			continue
 		}
 
+		existing, err := r.FindByProjectAndName(tx, projectId, name)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			r.knownMetrics.Store(key, true)
+			continue
+		}
+
 		metricType := defaultMetricType(name)
 		unit := defaultUnit(name)
 
@@ -34,12 +43,9 @@ func (r *metricRegistryRepository) EnsureRegistered(tx *sql.Tx, projectId uuid.U
 			CreatedAt:   time.Now().UTC(),
 		}
 
-		_, err := lit.Insert[models.MetricRegistry](tx, entry)
+		_, err = lit.Insert[models.MetricRegistry](tx, entry)
 		if err != nil {
-			existing, findErr := r.FindByProjectAndName(tx, projectId, name)
-			if findErr != nil || existing == nil {
-				return err
-			}
+			return err
 		}
 		r.knownMetrics.Store(key, true)
 	}
@@ -79,6 +85,15 @@ func (r *metricRegistryRepository) EnsureRegisteredWithUnits(tx *sql.Tx, project
 			continue
 		}
 
+		existing, err := r.FindByProjectAndName(tx, projectId, entry.Name)
+		if err != nil {
+			return err
+		}
+		if existing != nil {
+			r.knownMetrics.Store(key, true)
+			continue
+		}
+
 		metricType := entry.MetricType
 		if metricType == "" {
 			metricType = defaultMetricType(entry.Name)
@@ -97,12 +112,9 @@ func (r *metricRegistryRepository) EnsureRegisteredWithUnits(tx *sql.Tx, project
 			CreatedAt:   time.Now().UTC(),
 		}
 
-		_, err := lit.Insert[models.MetricRegistry](tx, rec)
+		_, err = lit.Insert[models.MetricRegistry](tx, rec)
 		if err != nil {
-			existing, findErr := r.FindByProjectAndName(tx, projectId, entry.Name)
-			if findErr != nil || existing == nil {
-				return err
-			}
+			return err
 		}
 		r.knownMetrics.Store(key, true)
 	}
