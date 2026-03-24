@@ -1,1 +1,1 @@
-export const env={"PUBLIC_TURNSTILE_SITE_KEY":"0x4AAAAAACQoqJ2QhNIw7EpO"}
+export const env={}
