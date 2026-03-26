@@ -72,7 +72,7 @@
 			</div>
 		</Card.Content>
 	</Card.Root>
-{:else if response && response.nodes.length > 0}
+{:else if response && response.nodes.length > 1}
 	<Card.Root>
 		<Card.Header>
 			<div class="flex items-center gap-2">
