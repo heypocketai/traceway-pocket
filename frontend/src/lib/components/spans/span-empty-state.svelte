@@ -71,6 +71,8 @@ span.End()`;
 		}
 	}
 
+	const GO_FRAMEWORKS: Framework[] = ['gin', 'fiber', 'chi', 'fasthttp', 'stdlib', 'custom'];
+	const isGoFramework = $derived(GO_FRAMEWORKS.includes(framework));
 	const docsUrl = $derived(getDocsUrl(framework));
 	const codeExample = $derived(getCodeExample(framework));
 </script>
@@ -85,14 +87,16 @@ span.End()`;
 		database queries, HTTP calls, or cache operations.
 	</p>
 
-	<div class="mb-4 w-full max-w-xl text-left">
-		<p class="mb-2 text-xs text-muted-foreground">Example usage:</p>
-		<div
-			class="overflow-hidden rounded-lg text-sm {themeState.isDark ? 'dark-code' : 'light-code'}"
-		>
-			<Highlight language={go} code={codeExample} />
+	{#if isGoFramework}
+		<div class="mb-4 w-full max-w-xl text-left">
+			<p class="mb-2 text-xs text-muted-foreground">Example usage:</p>
+			<div
+				class="overflow-hidden rounded-lg text-sm {themeState.isDark ? 'dark-code' : 'light-code'}"
+			>
+				<Highlight language={go} code={codeExample} />
+			</div>
 		</div>
-	</div>
+	{/if}
 
 	<!-- TODO: After we add the docs we should update this :/ -->
 	<!-- <a
