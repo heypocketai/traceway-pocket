@@ -1,9 +1,10 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand/v2"
 	"net/http"
 	"time"
@@ -16,6 +17,9 @@ import (
 
 //go:embed index.html
 var indexHTML []byte
+
+//go:embed static/*
+var staticFS embed.FS
 
 const (
 	appPort         = 8080
@@ -61,6 +65,9 @@ func main() {
 	router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 	})
+
+	staticSub, _ := fs.Sub(staticFS, "static")
+	router.StaticFS("/static", http.FS(staticSub))
 
 	router.GET("/api/test-error", func(c *gin.Context) {
 		time.Sleep(time.Duration(20+rand.IntN(80)) * time.Millisecond)
