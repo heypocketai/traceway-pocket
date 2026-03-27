@@ -46,6 +46,8 @@
     <img src="/express.png" alt="Express" class={className} />
 {:else if framework === 'remix'}
     <img src="/remix.png" alt="Remix" class={className} />
+{:else if framework === 'jquery'}
+    <img src="/jquery.png" alt="jQuery" class={className} />
 {:else if framework === 'cloudflare'}
     <img src="/cloudflare.png" alt="Cloudflare" class={className} />
 {:else if framework === 'opentelemetry'}

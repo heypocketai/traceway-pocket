@@ -17,6 +17,7 @@ const SDK_VISIBILITY = {
   react: "js-react",
   vue: "js-vue",
   svelte: "js-svelte",
+  jquery: "js-jquery",
   "js-sdk": "js-",
   otel: "otel",
   cloudflare: "cloudflare",

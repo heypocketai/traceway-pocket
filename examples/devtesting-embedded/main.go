@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -13,8 +14,11 @@ import (
 	tracewaygin "go.tracewayapp.com/tracewaygin"
 )
 
+//go:embed index.html
+var indexHTML []byte
+
 const (
-	appPort        = 8080
+	appPort         = 8080
 	backendToken    = "backend-dev-token"
 	frontendToken   = "frontend-dev-token"
 	monitoringToken = "monitoring-dev-token"
@@ -26,7 +30,7 @@ func main() {
 		tracewaybackend.WithPort(8082),
 		tracewaybackend.WithDefaultUser("admin@localhost.com", "admin"),
 		tracewaybackend.WithDefaultProject("Backend API", "go", backendToken),
-		tracewaybackend.WithDefaultProject("React Frontend", "react", frontendToken),
+		tracewaybackend.WithDefaultProject("jQuery Frontend", "jquery", frontendToken),
 		tracewaybackend.WithDefaultProject("Traceway Monitoring", "go", monitoringToken),
 		tracewaybackend.WithMonitoringURL(monitoringToken+"@http://localhost:8082/api/report"),
 		tracewaybackend.DisableLogging(),
@@ -40,7 +44,7 @@ func main() {
 			c.Header("Access-Control-Allow-Origin", origin)
 		}
 		c.Header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, traceway-trace-id")
 		c.Header("Access-Control-Expose-Headers", "traceway-trace-id")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
@@ -53,6 +57,10 @@ func main() {
 		backendToken+"@http://localhost:8082/api/report",
 		tracewaygin.WithOnErrorRecording(tracewaygin.RecordingQuery|tracewaygin.RecordingBody|tracewaygin.RecordingHeader|tracewaygin.RecordingUrl),
 	))
+
+	router.GET("/", func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
+	})
 
 	router.GET("/api/test-error", func(c *gin.Context) {
 		time.Sleep(time.Duration(20+rand.IntN(80)) * time.Millisecond)
@@ -68,9 +76,8 @@ func main() {
 
 	fmt.Println()
 	fmt.Println("===========================================")
-	fmt.Printf("  App API:    http://localhost:%d\n", appPort)
+	fmt.Printf("  App:        http://localhost:%d\n", appPort)
 	fmt.Println("  Dashboard:  http://localhost:8082")
-	fmt.Println("  Frontend:   http://localhost:5173")
 	fmt.Println("  Login:      admin@localhost.com / admin")
 	fmt.Println("===========================================")
 	fmt.Println()

@@ -16,6 +16,7 @@
   "react": "React",
   "vue": "Vue.js",
   "svelte": "Svelte",
+  "jquery": "jQuery",
   "js-sdk": "JS SDK Reference",
   "otel": "OpenTelemetry",
   "cloudflare": "Cloudflare Workers",

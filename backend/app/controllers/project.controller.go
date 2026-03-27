@@ -33,6 +33,7 @@ var validFrameworks = map[string]bool{
 	"nestjs":  true,
 	"express": true,
 	"remix":          true,
+	"jquery":         true,
 	"cloudflare":     true,
 	"opentelemetry":  true,
 	// PHP frameworks
@@ -84,7 +85,7 @@ func (p projectController) CreateProject(c *gin.Context) {
 
 	if !validFrameworks[request.Framework] {
 		traceway.CaptureMessage("Invalid framework received: " + request.Framework)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Framework must be one of: gin, fiber, chi, fasthttp, stdlib, custom, react, svelte, vuejs, nextjs, nestjs, express, remix, cloudflare, opentelemetry, symfony"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Framework must be one of: gin, fiber, chi, fasthttp, stdlib, custom, react, svelte, vuejs, nextjs, nestjs, express, remix, jquery, cloudflare, opentelemetry, symfony"})
 		return
 	}
 

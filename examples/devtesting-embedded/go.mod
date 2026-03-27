@@ -5,8 +5,8 @@ go 1.25.1
 require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/tracewayapp/traceway/backend v1.5.2
-	go.tracewayapp.com v1.0.1
-	go.tracewayapp.com/tracewaygin v1.0.1
+	go.tracewayapp.com v1.0.2
+	go.tracewayapp.com/tracewaygin v1.0.2
 )
 
 require (

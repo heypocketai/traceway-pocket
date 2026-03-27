@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Trace Test</title>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+        h1 { margin-bottom: 8px; }
+        p { color: #555; line-height: 1.5; }
+        code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+        .buttons { display: flex; gap: 12px; margin-bottom: 24px; }
+        .btn { color: #fff; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
+        .btn:hover { opacity: 0.9; }
+        .btn-error { background: #dc2626; }
+        .btn-success { background: #16a34a; }
+        .btn-clear { background: #6b7280; }
+        #log { background: #111; color: #0f0; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 13px; min-height: 200px; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Distributed Trace Test</h1>
+    <p>
+        Click the error button to trigger a backend 500 error. The
+        <code>traceway-trace-id</code> header links the frontend exception
+        to the backend error in the dashboard.
+    </p>
+
+    <div class="buttons">
+        <button class="btn btn-error" id="btn-error">Call Backend Error Endpoint</button>
+        <button class="btn btn-success" id="btn-success">Call Backend Success Endpoint</button>
+        <button class="btn btn-clear" id="btn-clear">Clear Log</button>
+    </div>
+
+    <div id="log">Waiting for actions...</div>
+
+    <script>
+    (function () {
+        var REPORT_URL = 'http://localhost:8082/api/report';
+        var FRONTEND_TOKEN = 'frontend-dev-token';
+
+        function generateUUID() {
+            if (crypto.randomUUID) return crypto.randomUUID();
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+                var r = Math.random() * 16 | 0;
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        }
+
+        function addLog(msg) {
+            var time = new Date().toLocaleTimeString();
+            var $log = $('#log');
+            var text = $log.text();
+            if (text === 'Waiting for actions...') text = '';
+            $log.text(text + '[' + time + '] ' + msg + '\n');
+        }
+
+        function gzipData(text) {
+            var blob = new Blob([text]);
+            var stream = blob.stream().pipeThrough(new CompressionStream('gzip'));
+            return new Response(stream).blob();
+        }
+
+        function captureException(errorMessage, distributedTraceId) {
+            var payload = {
+                collectionFrames: [{
+                    stackTraces: [{
+                        traceId: null,
+                        stackTrace: errorMessage,
+                        recordedAt: new Date().toISOString(),
+                        isMessage: false,
+                        distributedTraceId: distributedTraceId || null
+                    }],
+                    metrics: [],
+                    traces: []
+                }],
+                appVersion: '',
+                serverName: ''
+            };
+
+            gzipData(JSON.stringify(payload)).then(function (compressed) {
+                return fetch(REPORT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Encoding': 'gzip',
+                        'Authorization': 'Bearer ' + FRONTEND_TOKEN
+                    },
+                    body: compressed
+                });
+            }).catch(function (e) {
+                console.error('Failed to report exception:', e);
+            });
+        }
+
+        // Inject traceway-trace-id header into all jQuery AJAX requests
+        $.ajaxPrefilter(function (options, originalOptions, jqXHR) {
+            var traceId = generateUUID();
+            jqXHR._tracewayTraceId = traceId;
+            jqXHR.setRequestHeader('traceway-trace-id', traceId);
+        });
+
+        $('#btn-error').on('click', function () {
+            addLog('Calling GET /api/test-error ...');
+            $.ajax({
+                url: '/api/test-error',
+                method: 'GET',
+                complete: function (jqXHR) {
+                    var traceId = jqXHR.getResponseHeader('traceway-trace-id');
+                    addLog('Response: ' + jqXHR.status + ' \u2014 traceway-trace-id: ' + (traceId || 'not present'));
+                },
+                error: function (jqXHR) {
+                    var body = jqXHR.responseJSON || {};
+                    var errorMsg = body.error || 'Backend error';
+                    var traceId = jqXHR.getResponseHeader('traceway-trace-id');
+                    captureException('Error: ' + errorMsg, traceId);
+                    addLog('Captured frontend exception with distributedTraceId=' + traceId);
+                }
+            });
+        });
+
+        $('#btn-success').on('click', function () {
+            addLog('Calling GET /api/test-success ...');
+            $.ajax({
+                url: '/api/test-success',
+                method: 'GET',
+                complete: function (jqXHR) {
+                    var traceId = jqXHR.getResponseHeader('traceway-trace-id');
+                    addLog('Response: ' + jqXHR.status + ' \u2014 traceway-trace-id: ' + (traceId || 'not present'));
+                }
+            });
+        });
+
+        $('#btn-clear').on('click', function () {
+            $('#log').text('Waiting for actions...');
+        });
+    })();
+    </script>
+</body>
+</html>

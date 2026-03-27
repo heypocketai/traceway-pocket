@@ -121,6 +121,14 @@ const FRAMEWORKS = [
     badge: "production",
   },
   {
+    value: "js-jquery",
+    label: "jQuery",
+    description: "jQuery applications with automatic AJAX error capture.",
+    icon: "/jquery.png",
+    href: "/client/jquery",
+    badge: "new",
+  },
+  {
     value: "js-generic",
     label: "JS Generic",
     description: "Framework-agnostic JavaScript SDK for browsers.",

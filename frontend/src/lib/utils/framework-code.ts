@@ -28,6 +28,8 @@ export function getInstallCommand(framework: Framework): string {
 			return 'npm install @tracewayapp/express';
 		case 'remix':
 			return 'npm install @tracewayapp/remix';
+		case 'jquery':
+			return 'npm install @tracewayapp/jquery';
 		case 'symfony':
 			return 'composer require open-telemetry/sdk open-telemetry/exporter-otlp open-telemetry/opentelemetry-auto-symfony';
 		case 'cloudflare':
@@ -206,6 +208,14 @@ export default withTraceway({
     connectionString: "${connectionString}",
 });`;
 
+		case 'jquery':
+			return `import { init } from "@tracewayapp/jquery";
+
+init("${connectionString}");
+
+// jQuery AJAX errors are captured automatically
+// Distributed trace headers are injected into $.ajax() requests`;
+
 		case 'symfony':
 			return `<?php
 // public/index.php
@@ -336,6 +346,10 @@ captureException(new Error("Test error"));`;
 
 const { captureException } = useTraceway();
 captureException(new Error("Test error"));`;
+			case 'jquery':
+				return `import { captureException } from "@tracewayapp/jquery";
+
+captureException(new Error("Test error"));`;
 			default:
 				return `import { captureException } from "@tracewayapp/${getPackageName(framework)}";
 
@@ -356,6 +370,7 @@ function getPackageName(framework: Framework): string {
 		case 'nestjs': return 'nest';
 		case 'express': return 'express';
 		case 'remix': return 'remix';
+		case 'jquery': return 'jquery';
 		default: return 'react';
 	}
 }
@@ -375,6 +390,7 @@ export function getFrameworkLabel(framework: Framework): string {
 		nestjs: 'NestJS',
 		express: 'Express',
 		remix: 'Remix',
+		jquery: 'jQuery',
 		cloudflare: 'Cloudflare',
 		opentelemetry: 'OpenTelemetry',
 		symfony: 'Symfony',
