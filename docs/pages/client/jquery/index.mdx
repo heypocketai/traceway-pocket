@@ -13,7 +13,7 @@ npm install @tracewayapp/jquery
 ```javascript
 import { init } from "@tracewayapp/jquery";
 
-init("your-token@https://traceway.example.com/api/report");
+init("your-token@https://cloud.tracewayapp.com/api/report");
 ```
 
 ### Via CDN
@@ -24,7 +24,7 @@ No build step needed — add two script tags after jQuery:
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tracewayapp/jquery@1/dist/traceway-jquery.iife.global.js"></script>
 <script>
-  TracewayJQuery.init("your-token@https://traceway.example.com/api/report");
+  TracewayJQuery.init("your-token@https://cloud.tracewayapp.com/api/report");
 </script>
 ```
 
@@ -72,7 +72,7 @@ try {
 ```javascript
 import { init } from "@tracewayapp/jquery";
 
-init("your-token@https://traceway.example.com/api/report", {
+init("your-token@https://cloud.tracewayapp.com/api/report", {
   debug: true,
   version: "1.0.0",
 });
