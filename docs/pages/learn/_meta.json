@@ -2,6 +2,7 @@
   "index": "Overview",
   "data-flow": "Data Flow",
   "traces": "Traces",
+  "ai-tracing": "AI Tracing",
   "issues": "Issues",
   "attributes": "Attributes",
   "spans": "Spans",

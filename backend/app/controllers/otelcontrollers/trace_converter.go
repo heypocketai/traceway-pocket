@@ -1,23 +1,31 @@
 package otelcontrollers
 
 import (
-	"github.com/tracewayapp/traceway/backend/app/controllers/clientcontrollers"
-	"github.com/tracewayapp/traceway/backend/app/models"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tracewayapp/traceway/backend/app/controllers/clientcontrollers"
+	"github.com/tracewayapp/traceway/backend/app/models"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
+
+type aiTraceConversation struct {
+	StorageKey string
+	Content    []byte
+}
 
 func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceRequest) (
 	endpoints []models.Endpoint,
 	tasks []models.Task,
 	spans []models.Span,
 	exceptions []models.ExceptionStackTrace,
+	aiTraces []models.AiTrace,
+	aiConversations []aiTraceConversation,
 ) {
 
 	for _, rs := range req.ResourceSpans {
@@ -80,6 +88,15 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 						)
 						t.DistributedTraceId = distributedTraceId
 						tasks = append(tasks, t)
+					} else if hasGenAiAttributes(spanAttrs) {
+						aiTrace := buildAiTrace(
+							traceId, projectId, span, spanAttrs, allAttrs,
+							startTime, duration, serverName, appVersion,
+						)
+						aiTraces = append(aiTraces, aiTrace)
+						if conv := extractConversation(spanAttrs, projectId, traceId); conv != nil {
+							aiConversations = append(aiConversations, *conv)
+						}
 					} else {
 						continue
 					}
@@ -248,6 +265,170 @@ func buildException(
 		RecordedAt:    nanoToTime(event.TimeUnixNano),
 		AppVersion:    appVersion,
 		ServerName:    serverName,
+	}
+}
+
+func hasGenAiAttributes(attrs []*commonpb.KeyValue) bool {
+	for _, kv := range attrs {
+		if strings.HasPrefix(kv.Key, "gen_ai.") {
+			return true
+		}
+	}
+	return false
+}
+
+func buildAiTrace(
+	id, projectId uuid.UUID,
+	span *tracepb.Span,
+	attrs []*commonpb.KeyValue,
+	allAttrs map[string]string,
+	startTime time.Time,
+	duration time.Duration,
+	serverName, appVersion string,
+) models.AiTrace {
+	model := getStringAttribute(attrs, "gen_ai.request.model")
+	responseModel := getStringAttribute(attrs, "gen_ai.response.model")
+	provider := getStringAttribute(attrs, "gen_ai.system")
+	if provider == "" {
+		provider = getStringAttribute(attrs, "gen_ai.provider.name")
+	}
+	operation := getStringAttribute(attrs, "gen_ai.operation.name")
+
+	inputTokens, _ := getIntAttribute(attrs, "gen_ai.usage.input_tokens")
+	outputTokens, _ := getIntAttribute(attrs, "gen_ai.usage.output_tokens")
+	totalTokens, hasTotalTokens := getIntAttribute(attrs, "gen_ai.usage.total_tokens")
+	if !hasTotalTokens {
+		totalTokens = inputTokens + outputTokens
+	}
+	cachedTokens, _ := getIntAttribute(attrs, "gen_ai.usage.input_tokens.cached")
+	reasoningTokens, _ := getIntAttribute(attrs, "gen_ai.usage.output_tokens.reasoning")
+
+	inputCost := getFloatAttribute(attrs, "gen_ai.usage.input_cost")
+	outputCost := getFloatAttribute(attrs, "gen_ai.usage.output_cost")
+	totalCost := getFloatAttribute(attrs, "gen_ai.usage.total_cost")
+	if totalCost == 0 {
+		totalCost = inputCost + outputCost
+	}
+
+	traceName := getStringAttribute(attrs, "trace.name")
+	if traceName == "" {
+		traceName = span.Name
+	}
+
+	userId := getStringAttribute(attrs, "user.id")
+	finishReason := getStringAttribute(attrs, "gen_ai.response.finish_reason")
+	if finishReason == "" {
+		finishReason = getStringAttribute(attrs, "gen_ai.response.finish_reasons")
+	}
+
+	statusCode := uint8(span.Status.GetCode())
+	storageKey := fmt.Sprintf("ai-traces/%s/%s.json", projectId, id)
+
+	filteredAttrs := filterNonStandardAiAttrs(allAttrs)
+
+	return models.AiTrace{
+		Id:              id,
+		ProjectId:       projectId,
+		RecordedAt:      startTime,
+		Duration:        duration,
+		StatusCode:      statusCode,
+		Model:           model,
+		ResponseModel:   responseModel,
+		Provider:        provider,
+		Operation:       operation,
+		InputTokens:     inputTokens,
+		OutputTokens:    outputTokens,
+		TotalTokens:     totalTokens,
+		CachedTokens:    cachedTokens,
+		ReasoningTokens: reasoningTokens,
+		InputCost:       inputCost,
+		OutputCost:      outputCost,
+		TotalCost:       totalCost,
+		TraceName:       traceName,
+		UserId:          userId,
+		FinishReason:    finishReason,
+		ServerName:      serverName,
+		AppVersion:      appVersion,
+		StorageKey:      storageKey,
+		Attributes:      filteredAttrs,
+	}
+}
+
+var standardAiAttrPrefixes = []string{
+	"gen_ai.request.model",
+	"gen_ai.response.model",
+	"gen_ai.system",
+	"gen_ai.provider.name",
+	"gen_ai.operation.name",
+	"gen_ai.usage.",
+	"gen_ai.prompt",
+	"gen_ai.completion",
+	"gen_ai.response.finish_reason",
+	"gen_ai.response.finish_reasons",
+	"trace.name",
+	"trace.input",
+	"trace.output",
+	"span.input",
+	"span.output",
+	"user.id",
+}
+
+func filterNonStandardAiAttrs(allAttrs map[string]string) map[string]string {
+	if len(allAttrs) == 0 {
+		return nil
+	}
+	result := make(map[string]string)
+	for k, v := range allAttrs {
+		standard := false
+		for _, prefix := range standardAiAttrPrefixes {
+			if k == prefix || strings.HasPrefix(k, prefix) {
+				standard = true
+				break
+			}
+		}
+		if !standard {
+			result[k] = v
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func extractConversation(attrs []*commonpb.KeyValue, projectId, traceId uuid.UUID) *aiTraceConversation {
+	input := getStringAttribute(attrs, "gen_ai.prompt")
+	if input == "" {
+		input = getStringAttribute(attrs, "trace.input")
+	}
+	if input == "" {
+		input = getStringAttribute(attrs, "span.input")
+	}
+
+	output := getStringAttribute(attrs, "gen_ai.completion")
+	if output == "" {
+		output = getStringAttribute(attrs, "trace.output")
+	}
+	if output == "" {
+		output = getStringAttribute(attrs, "span.output")
+	}
+
+	if input == "" && output == "" {
+		return nil
+	}
+
+	content := map[string]string{
+		"input":  input,
+		"output": output,
+	}
+	data, err := json.Marshal(content)
+	if err != nil {
+		return nil
+	}
+
+	return &aiTraceConversation{
+		StorageKey: fmt.Sprintf("ai-traces/%s/%s.json", projectId, traceId),
+		Content:    data,
 	}
 }
 

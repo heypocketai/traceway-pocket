@@ -17,6 +17,7 @@ const frameworks = [
   { name: "Cloudflare", src: "/images/frameworks/cloudflare.png" },
   { name: "jQuery", src: "/images/frameworks/jquery.png" },
   { name: "Symfony", src: "/images/frameworks/symfony.png" },
+  { name: "OpenRouter", src: "/images/frameworks/openrouter.png" },
 ];
 
 export function FrameworkMarquee() {

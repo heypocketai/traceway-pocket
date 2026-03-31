@@ -1,0 +1,87 @@
+# AI Tracing
+
+**AI Tracing** lets you monitor LLM and AI model calls across your application. Every API call to an AI provider — whether it's OpenAI, Anthropic, Cohere, or any model routed through OpenRouter — is captured as an AI trace with full cost, token usage, and conversation data.
+
+## Why AI Observability Matters
+
+AI API calls are fundamentally different from traditional HTTP requests:
+
+- **Costs are unpredictable** — A single prompt with a large context window can cost 100x more than average. Without visibility, cost spikes go unnoticed until the invoice arrives.
+- **Latency varies wildly** — The same model can respond in 500ms or 30 seconds depending on prompt length, model load, and provider routing. You need P50/P95 breakdowns to understand real-world performance.
+- **Token usage drives cost** — Input and output tokens are billed separately at different rates. Cached tokens and reasoning tokens add further complexity. You need per-call granularity.
+- **Prompt/completion quality matters** — Seeing the actual conversation helps debug unexpected model behavior, hallucinations, or prompt injection issues.
+- **Provider reliability differs** — When routing through multiple providers, you need to know which provider is slower, more expensive, or failing more often.
+
+## What Gets Captured
+
+Every AI trace records:
+
+| Field | Description |
+|-------|-------------|
+| Model | The requested model (e.g., `openai/gpt-4-turbo`) |
+| Provider | The AI provider (e.g., `openai`, `anthropic`) |
+| Duration | End-to-end latency of the API call |
+| Input Tokens | Tokens in the prompt |
+| Output Tokens | Tokens in the completion |
+| Total Tokens | Combined token count |
+| Cached Tokens | Tokens served from cache (reduced cost) |
+| Reasoning Tokens | Tokens used for chain-of-thought reasoning |
+| Input Cost | Cost of the prompt |
+| Output Cost | Cost of the completion |
+| Total Cost | Combined cost |
+| Finish Reason | Why the model stopped (e.g., `stop`, `length`) |
+| User ID | The user who triggered the call |
+| Conversation | Full input/output content (stored separately) |
+
+## How It Works
+
+AI traces are ingested via the [OpenTelemetry](/client/otel) OTLP/HTTP endpoint. AI providers that support OTLP trace export (like [OpenRouter](/client/openrouter)) send spans with `gen_ai.*` semantic convention attributes. Traceway detects these attributes and stores them as AI traces.
+
+The data flow:
+
+1. **AI provider sends OTLP span** — The span contains `gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.total_cost`, and other standardized attributes
+2. **Traceway parses gen_ai attributes** — The OTEL trace converter detects spans with `gen_ai.*` attributes and extracts structured fields
+3. **Conversation content stored separately** — The full prompt and completion are stored in object storage (S3 or local filesystem) to keep the database lean
+4. **Dashboard shows aggregated view** — AI traces are grouped by trace name (your agent or workflow identifier), with drill-down to individual calls
+
+## Three-Level Drill-Down
+
+AI traces follow the same drill-down pattern as [endpoints](/learn/traces#endpoints):
+
+### Level 1: Grouped by Trace Name
+
+See all your AI agents/workflows at a glance with aggregate metrics — total calls, P50/P95 duration, total tokens consumed, and total cost.
+
+<img src="/ai-traces.png" alt="AI Traces Dashboard" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+
+### Level 2: Individual Calls
+
+Click a trace name to see every individual call — timestamp, duration, model used, tokens in/out, cost, and provider.
+
+### Level 3: Call Detail
+
+Click a specific call to see the full detail: token breakdown (including cached and reasoning tokens), cost breakdown, all metadata attributes, and the complete conversation with the model rendered as a chat view.
+
+<img src="/ai-traces-detail.png" alt="AI Trace Detail" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+
+## Conversation Storage
+
+Conversation content (prompts and completions) can be large — a single prompt with RAG context might be 50KB+. To keep the database fast for aggregation queries, Traceway stores conversation content in object storage (S3 or local filesystem) and reads it on demand when you view a specific trace.
+
+This means:
+- **List views are fast** — No large text fields in aggregation queries
+- **Detail views load conversations** — The full input/output is fetched from storage when you drill into a specific call
+- **Privacy-friendly** — You can configure your AI provider to exclude prompt/completion data if needed
+
+## Supported Providers
+
+Any AI provider or gateway that exports OTLP traces with `gen_ai.*` semantic convention attributes works with Traceway. Currently tested:
+
+| Provider | Integration |
+|----------|-------------|
+| [OpenRouter](/client/openrouter) | Native OTLP export via Observability settings |
+| Any OpenTelemetry-instrumented app | Via `gen_ai.*` semantic conventions |
+
+## Getting Started
+
+See the [OpenRouter integration guide](/client/openrouter) for a step-by-step setup, or the [OpenTelemetry guide](/client/otel) if you're instrumenting your own AI calls.

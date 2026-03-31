@@ -3,6 +3,14 @@ import { useSdk } from "./SdkContext";
 
 const FRAMEWORKS = [
   {
+    value: "openrouter",
+    label: "OpenRouter",
+    description: "AI observability for OpenRouter with automatic OTLP trace export.",
+    icon: "/openrouter.png",
+    href: "/client/openrouter",
+    badge: "new",
+  },
+  {
     value: "otel",
     label: "OpenTelemetry (otel)",
     description: "Send traces and metrics from any OTel-instrumented app to Traceway.",

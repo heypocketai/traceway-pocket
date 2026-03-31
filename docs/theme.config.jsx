@@ -19,6 +19,7 @@ const SDK_VISIBILITY = {
   svelte: "js-svelte",
   jquery: "js-jquery",
   "js-sdk": "js-",
+  openrouter: "openrouter",
   otel: "otel",
   cloudflare: "cloudflare",
   symfony: "php-symfony",

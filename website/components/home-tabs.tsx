@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Server, Monitor, Network, ArrowRight } from "lucide-react";
+import { Server, Monitor, Network, Workflow, ArrowRight } from "lucide-react";
 
 const tabs = [
   {
@@ -58,6 +58,24 @@ const tabs = [
       "Exception pinpointing across services",
     ],
     href: "/product/distributed-tracing",
+  },
+  {
+    id: "ai-agents",
+    label: "AI Agents",
+    icon: Workflow,
+    iconBg: "bg-violet-50",
+    iconColor: "text-violet-600",
+    dotColor: "bg-violet-500",
+    heading: "Track every AI call, its cost, and its conversation.",
+    description:
+      "Monitor LLM costs, token usage, and latency across every provider. See the full prompt and completion for every call, with per-agent and per-model breakdowns.",
+    bullets: [
+      "Per-call cost and token tracking",
+      "Conversation replay with chat view",
+      "P50/P95 latency per agent and model",
+      "Works with OpenRouter and any OTel provider",
+    ],
+    href: "/product/ai-tracing",
   },
 ];
 

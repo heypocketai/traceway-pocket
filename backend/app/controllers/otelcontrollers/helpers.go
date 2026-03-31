@@ -97,3 +97,17 @@ func getIntAttribute(attrs []*commonpb.KeyValue, key string) (int64, bool) {
 	}
 	return 0, false
 }
+
+func getFloatAttribute(attrs []*commonpb.KeyValue, key string) float64 {
+	for _, kv := range attrs {
+		if kv.Key == key && kv.Value != nil {
+			switch v := kv.Value.Value.(type) {
+			case *commonpb.AnyValue_DoubleValue:
+				return v.DoubleValue
+			case *commonpb.AnyValue_IntValue:
+				return float64(v.IntValue)
+			}
+		}
+	}
+	return 0
+}

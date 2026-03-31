@@ -85,6 +85,11 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.POST("/tasks/task", middleware.UseAppAuth, middleware.RequireProjectAccess, TaskController.FindByTaskName)
 	router.POST("/tasks/:taskId", middleware.UseAppAuth, middleware.RequireProjectAccess, TaskDetailController.GetTaskDetail)
 
+	// AI Traces (projectId in body)
+	router.POST("/ai-traces/grouped", middleware.UseAppAuth, middleware.RequireProjectAccess, AiTraceController.FindGroupedByTraceName)
+	router.POST("/ai-traces/trace", middleware.UseAppAuth, middleware.RequireProjectAccess, AiTraceController.FindByTraceName)
+	router.POST("/ai-traces/:traceId", middleware.UseAppAuth, middleware.RequireProjectAccess, AiTraceController.GetAiTraceDetail)
+
 	// Distributed traces
 	router.POST("/distributed-traces/:distributedTraceId", middleware.UseAppAuth, DistributedTraceController.GetDistributedTrace)
 

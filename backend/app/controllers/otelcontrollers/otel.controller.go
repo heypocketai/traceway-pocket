@@ -1,15 +1,20 @@
 package otelcontrollers
 
 import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
 	"github.com/tracewayapp/traceway/backend/app/hooks"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"github.com/tracewayapp/traceway/backend/app/services"
-	"net/http"
-
-	"github.com/gin-gonic/gin"
+	"github.com/tracewayapp/traceway/backend/app/storage"
 	traceway "go.tracewayapp.com"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type otelController struct{}
@@ -17,12 +22,13 @@ type otelController struct{}
 var OtelController = otelController{}
 
 func (o otelController) ExportTraces(c *gin.Context) {
+	fmt.Println("A00")
 	projectId, err := middleware.GetProjectId(c)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("UseClientAuth middleware must be applied: %w", err))
 		return
 	}
-
+	fmt.Println("A0")
 	if project, exists := c.Get(middleware.ProjectContextKey); exists {
 		if p, ok := project.(*models.Project); ok && p.OrganizationId != nil {
 			if !hooks.CanReport(*p.OrganizationId) {
@@ -31,6 +37,7 @@ func (o otelController) ExportTraces(c *gin.Context) {
 			}
 		}
 	}
+	fmt.Println("A1")
 
 	req, err := decodeTraceRequest(c)
 	if err != nil {
@@ -38,7 +45,12 @@ func (o otelController) ExportTraces(c *gin.Context) {
 		return
 	}
 
-	endpoints, tasks, spans, exceptions := convertTraces(projectId, req)
+	fmt.Println("WTF??")
+	if jsonBytes, err := protojson.Marshal(req); err == nil {
+		log.Printf("[OTEL TRACES] Payload: %s", string(jsonBytes))
+	}
+
+	endpoints, tasks, spans, exceptions, aiTraces, aiConversations := convertTraces(projectId, req)
 
 	if len(endpoints) > 0 {
 		if err := repositories.EndpointRepository.InsertAsync(c, endpoints); err != nil {
@@ -62,6 +74,24 @@ func (o otelController) ExportTraces(c *gin.Context) {
 	if err := repositories.SpanRepository.InsertAsync(c, spans); err != nil {
 		c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting OTEL spans: %w", err))
 		return
+	}
+
+	if len(aiTraces) > 0 {
+		if err := repositories.AiTraceRepository.InsertAsync(c, aiTraces); err != nil {
+			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting OTEL ai traces: %w", err))
+			return
+		}
+
+		if len(aiConversations) > 0 {
+			convs := aiConversations
+			go func() {
+				for _, conv := range convs {
+					if err := storage.Store.Write(context.Background(), conv.StorageKey, conv.Content); err != nil {
+						traceway.CaptureException(fmt.Errorf("failed to write AI trace conversation (key=%s): %w", conv.StorageKey, err))
+					}
+				}
+			}()
+		}
 	}
 
 	var exceptionHashes []string

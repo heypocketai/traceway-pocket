@@ -3,6 +3,7 @@
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import {
 		Bell,
+		Workflow,
 		Bug,
 		Link2,
 		ChartNoAxesCombined,
@@ -27,7 +28,7 @@
 		external?: boolean;
 	}
 
-	const hiddenForFrontend = new Set(['Dashboard', 'Endpoints', 'Tasks', 'Metrics']);
+	const hiddenForFrontend = new Set(['Dashboard', 'Endpoints', 'Tasks', 'Metrics', 'AI Traces']);
 	const hiddenForCloudflare = new Set(['Metrics']);
 
 	const allSidebarItems: SidebarItem[] = [
@@ -35,6 +36,7 @@
 		{ Icon: Bug, href: '/issues', title: 'Issues', stickyParams: ['preset', 'from', 'to'] },
 		{ Icon: Gauge, href: '/endpoints', title: 'Endpoints', stickyParams: ['preset', 'from', 'to'] },
 		{ Icon: ListEnd, href: '/tasks', title: 'Tasks', stickyParams: ['preset', 'from', 'to'] },
+		{ Icon: Workflow, href: '/ai-traces', title: 'AI Traces', stickyParams: ['preset', 'from', 'to'] },
 		{
 			Icon: ChartNoAxesCombined,
 			href: '/metrics',

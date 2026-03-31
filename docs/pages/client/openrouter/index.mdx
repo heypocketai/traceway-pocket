@@ -1,0 +1,96 @@
+# OpenRouter Integration
+
+Send AI traces from [OpenRouter](https://openrouter.ai) to Traceway with zero code changes. OpenRouter's built-in observability feature exports OTLP traces for every LLM call, giving you full visibility into costs, token usage, latency, and conversations.
+
+## How It Works
+
+1. **OpenRouter routes your AI calls** to the best model provider (OpenAI, Anthropic, Google, etc.)
+2. **Observability broadcasts traces** — OpenRouter sends an OTLP span for each completion with `gen_ai.*` attributes
+3. **Traceway captures and stores** — Model, tokens, costs, duration, and conversation content appear in your AI Traces dashboard
+
+No SDK or code changes needed — OpenRouter handles the instrumentation automatically.
+
+## Setup
+
+### 1. Get Your Traceway Project Token
+
+AI Tracing works with any backend or OpenTelemetry project in Traceway. If you don't have a project yet, create a new one and select **OpenTelemetry** as the framework — this gives you a project token you can use for the OpenRouter integration.
+
+In your Traceway dashboard, go to **Connection** and copy your project token.
+
+### 2. Configure OpenRouter Observability
+
+1. Go to [OpenRouter Settings → Observability](https://openrouter.ai/settings/integrations)
+2. Enable **Broadcast**
+3. Click **Add Destination** next to **OpenTelemetry Collector**
+4. Fill in the connection details:
+
+| Field | Value |
+|-------|-------|
+| **Name** | `Traceway` (or any label) |
+| **Endpoint** | `https://cloud.tracewayapp.com/api/otel/v1/traces` |
+| **Headers** | `{"Authorization": "Bearer YOUR_PROJECT_TOKEN"}` |
+
+Replace `YOUR_PROJECT_TOKEN` with your actual project token. If you're self-hosting, replace the endpoint with your instance URL.
+
+5. Click **Test Connection** to verify
+6. Click **Send Trace** to send a test trace
+7. Click **Add** to save
+
+### 3. Verify in Traceway
+
+Open your Traceway dashboard and navigate to **AI Traces**. You should see your test trace appear within a few seconds.
+
+## Configuration Options
+
+OpenRouter provides several configuration options for the observability destination:
+
+### Privacy Mode
+
+When enabled, OpenRouter excludes prompt and completion content from traces. Only metadata (model, tokens, cost, duration) is sent. Enable this if you don't want conversation data stored in Traceway.
+
+### Sampling Rate
+
+Controls what percentage of traces are sent to Traceway. Set to `1` (100%) to capture every call, or lower it to reduce volume. Default is `1`.
+
+### API Key Filter
+
+Optionally filter traces to only include calls made with specific API keys. Useful if you have multiple environments sharing the same OpenRouter organization.
+
+## What Gets Captured
+
+Every OpenRouter completion generates a trace with:
+
+| Field | Source Attribute | Example |
+|-------|-----------------|---------|
+| Model | `gen_ai.request.model` | `openai/gpt-4-turbo` |
+| Provider | `gen_ai.system` | `openai` |
+| Operation | `gen_ai.operation.name` | `chat` |
+| Input Tokens | `gen_ai.usage.input_tokens` | `50` |
+| Output Tokens | `gen_ai.usage.output_tokens` | `100` |
+| Cached Tokens | `gen_ai.usage.input_tokens.cached` | `20` |
+| Reasoning Tokens | `gen_ai.usage.output_tokens.reasoning` | `10` |
+| Input Cost | `gen_ai.usage.input_cost` | `0.005` |
+| Output Cost | `gen_ai.usage.output_cost` | `0.015` |
+| Total Cost | `gen_ai.usage.total_cost` | `0.020` |
+| Finish Reason | `gen_ai.response.finish_reason` | `stop` |
+| Prompt | `gen_ai.prompt` | Full messages JSON |
+| Completion | `gen_ai.completion` | Full response JSON |
+| User ID | `user.id` | Your OpenRouter user/org ID |
+| Trace Name | `trace.name` | Workflow identifier |
+| Temperature | `gen_ai.request.temperature` | `0.7` |
+
+## Self-Hosted Setup
+
+If you're running Traceway on your own infrastructure, use your instance URL as the endpoint:
+
+```
+https://your-traceway-instance.com/api/otel/v1/traces
+```
+
+The rest of the configuration is identical — project token in the Authorization header, same format.
+
+## Next Steps
+
+- [AI Tracing concepts](/learn/ai-tracing) — Understand how AI traces are stored and queried
+- [OpenTelemetry](/client/otel) — Send traces from any OTel-instrumented application

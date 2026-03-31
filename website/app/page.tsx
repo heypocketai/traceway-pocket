@@ -22,6 +22,7 @@ import {
   Lock,
   Terminal,
   GitCompare,
+  Workflow,
 } from "lucide-react";
 import { CodeTabs } from "@/components/code-tabs";
 import { ImpactScoreVisual } from "@/components/impact-score-visual";
@@ -288,6 +289,58 @@ export default function Home() {
             </p>
           </div>
           <HomeTabs />
+        </div>
+      </section>
+
+      {/* Section: AI Tracing */}
+      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
+        <div className="container mx-auto px-4 max-w-5xl">
+          <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+            <div className="flex-1 space-y-6">
+              <div className="w-12 h-12 bg-violet-50 rounded-2xl flex items-center justify-center">
+                <Workflow className="w-6 h-6 text-violet-600" />
+              </div>
+              <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
+                AI Tracing for LLM observability
+              </h3>
+              <p className="text-zinc-600 text-lg leading-relaxed">
+                Monitor every AI call with full cost, token usage, latency, and conversation tracking.
+                Works with OpenRouter, OpenAI, Anthropic, and any OpenTelemetry-compatible provider — zero code changes needed.
+              </p>
+              <ul className="space-y-3 pt-2">
+                <li className="flex items-center gap-3 text-zinc-700">
+                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500"></div>
+                  Per-call cost and token tracking
+                </li>
+                <li className="flex items-center gap-3 text-zinc-700">
+                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500"></div>
+                  Conversation replay with chat view
+                </li>
+                <li className="flex items-center gap-3 text-zinc-700">
+                  <div className="w-1.5 h-1.5 rounded-full bg-violet-500"></div>
+                  P50/P95 latency per agent and model
+                </li>
+              </ul>
+              <Link
+                href="/product/ai-tracing"
+                className="inline-flex items-center text-sm font-medium text-violet-600 hover:text-violet-800 transition-colors"
+              >
+                Learn more about AI Tracing <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </div>
+            <div className="flex-1 w-full relative">
+              <div className="absolute inset-0 bg-gradient-to-tl from-violet-100/50 to-transparent rounded-3xl transform -rotate-3 scale-105 -z-10"></div>
+              <div className="relative rounded-xl overflow-hidden border border-zinc-200 bg-white">
+                <Image
+                  src="/images/ai-traces-detail.png"
+                  alt="AI Tracing Dashboard"
+                  width={800}
+                  height={600}
+                  className="w-full h-auto"
+                />
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -595,6 +648,17 @@ export default function Home() {
                 duration, success/failure status, and any exceptions thrown
                 during the task. Tasks are listed in a dedicated dashboard with
                 filtering and sorting.
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="item-14" className="border-b-zinc-200">
+              <AccordionTrigger className="text-zinc-900 hover:text-zinc-700 hover:no-underline text-left">
+                Does Traceway support AI/LLM observability?
+              </AccordionTrigger>
+              <AccordionContent className="text-zinc-600 leading-relaxed">
+                Yes. Traceway captures AI traces from any provider that exports
+                OpenTelemetry spans with <code className="bg-zinc-100 px-1 py-0.5 rounded text-sm">gen_ai.*</code> attributes.
+                OpenRouter has built-in support — enable Observability in your settings and add Traceway as a destination.
+                Every LLM call is tracked with model, input/output tokens, costs, latency, and the full conversation content.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

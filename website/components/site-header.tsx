@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
-import { Github, AlertCircle, Activity, Video, ChevronDown, Network } from "lucide-react";
+import { Github, AlertCircle, Activity, Video, ChevronDown, Network, Workflow } from "lucide-react";
 import { MobileNav } from "@/components/mobile-nav";
 
 export function SiteHeader() {
@@ -103,6 +103,19 @@ export function SiteHeader() {
                                         <div>
                                             <div className="text-sm font-medium text-zinc-900">Distributed Tracing</div>
                                             <p className="text-xs text-zinc-500 mt-0.5">Cross-service traces linked to frontend session replays</p>
+                                        </div>
+                                    </Link>
+                                    <Link
+                                        href="/product/ai-tracing"
+                                        className="flex items-start gap-3 rounded-md p-3 hover:bg-zinc-50 transition-colors"
+                                        onClick={() => setOpen(false)}
+                                    >
+                                        <div className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center shrink-0 mt-0.5">
+                                            <Workflow className="w-4 h-4 text-violet-600" />
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-medium text-zinc-900">AI Tracing</div>
+                                            <p className="text-xs text-zinc-500 mt-0.5">Monitor LLM costs, tokens, latency, and conversations</p>
                                         </div>
                                     </Link>
                                 </div>
