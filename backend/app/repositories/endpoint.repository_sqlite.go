@@ -4,6 +4,7 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math"
 	"sort"
@@ -735,7 +736,7 @@ func (e *endpointRepository) GetSlowEndpoint(ctx context.Context, projectId uuid
 		return 0, "", err
 	}
 	if result == nil {
-		return 0, "", fmt.Errorf("not found")
+		return 0, "", sql.ErrNoRows
 	}
 	return result.OffsetMs, result.Reason, nil
 }
