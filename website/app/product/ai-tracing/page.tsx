@@ -62,7 +62,7 @@ export default function AiTracingPage() {
                         </div>
                         <div className="flex-1 w-full relative">
                             <div className="absolute inset-0 bg-gradient-to-tr from-green-100/50 to-transparent rounded-3xl transform rotate-3 scale-105 -z-10"></div>
-                            <div className="relative rounded-xl overflow-hidden border border-zinc-200 bg-white">
+                            <div className="relative rounded-xl overflow-hidden">
                                 <Image
                                     src="/images/ai-traces-cost.png"
                                     alt="AI Traces Cost Dashboard"
@@ -105,7 +105,7 @@ export default function AiTracingPage() {
                         </div>
                         <div className="flex-1 w-full relative">
                             <div className="absolute inset-0 bg-gradient-to-tl from-violet-100/50 to-transparent rounded-3xl transform -rotate-3 scale-105 -z-10"></div>
-                            <div className="relative rounded-xl overflow-hidden border border-zinc-200 bg-white">
+                            <div className="relative rounded-xl overflow-hidden">
                                 <Image
                                     src="/images/ai-traces-conversation.png"
                                     alt="AI Trace Conversation View"
@@ -148,7 +148,7 @@ export default function AiTracingPage() {
                         </div>
                         <div className="flex-1 w-full relative">
                             <div className="absolute inset-0 bg-gradient-to-tr from-blue-100/50 to-transparent rounded-3xl transform rotate-3 scale-105 -z-10"></div>
-                            <div className="relative rounded-xl overflow-hidden border border-zinc-200 bg-white">
+                            <div className="relative rounded-xl overflow-hidden">
                                 <Image
                                     src="/images/ai-traces-latency.png"
                                     alt="AI Traces Performance Dashboard"

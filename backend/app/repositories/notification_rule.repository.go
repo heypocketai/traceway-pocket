@@ -42,7 +42,7 @@ func (r *notificationRuleRepository) FindEnabledPolledRules(tx *sql.Tx) ([]*mode
 		FROM notification_rules r
 		JOIN notification_channels c ON c.id = r.channel_id
 		WHERE r.enabled = true AND c.enabled = true
-			AND r.rule_type NOT IN ('new_error', 'error_regression')`,
+			AND r.rule_type NOT IN ('new_error', 'error_regression', 'ai_trace_cost')`,
 	)
 }
 
@@ -54,7 +54,7 @@ func (r *notificationRuleRepository) FindEnabledEventRules(tx *sql.Tx, projectId
 		FROM notification_rules r
 		JOIN notification_channels c ON c.id = r.channel_id
 		WHERE r.project_id = :project_id AND r.enabled = true AND c.enabled = true
-			AND r.rule_type IN ('new_error', 'error_regression')`,
+			AND r.rule_type IN ('new_error', 'error_regression', 'ai_trace_cost')`,
 		lit.P{"project_id": projectId},
 	)
 }

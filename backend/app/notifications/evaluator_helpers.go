@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -21,7 +22,7 @@ type newErrorConfig struct {
 
 func registerReportHook() {
 	hooks.RegisterReportHook(func(event hooks.ReportEvent) {
-		if len(event.ExceptionHashes) == 0 {
+		if len(event.ExceptionHashes) == 0 && len(event.AiTraces) == 0 {
 			return
 		}
 		go evaluateEventRules(event)
@@ -49,7 +50,48 @@ func evaluateEventRules(event hooks.ReportEvent) {
 			evaluateNewError(ctx, rule, event)
 		case "error_regression":
 			evaluateErrorRegression(ctx, rule, event)
+		case "ai_trace_cost":
+			evaluateAiTraceCostEvent(rule, event)
 		}
+	}
+}
+
+type aiTraceCostEventConfig struct {
+	TraceName     string  `json:"traceName"`
+	ThresholdCost float64 `json:"thresholdCost"`
+}
+
+func evaluateAiTraceCostEvent(rule *models.NotificationRuleWithChannel, event hooks.ReportEvent) {
+	if len(event.AiTraces) == 0 {
+		return
+	}
+
+	var cfg aiTraceCostEventConfig
+	if err := json.Unmarshal(rule.Config, &cfg); err != nil {
+		return
+	}
+	if cfg.ThresholdCost <= 0 {
+		return
+	}
+
+	projectName := getProjectName(event.ProjectId)
+
+	for _, at := range event.AiTraces {
+		if at.TotalCost < cfg.ThresholdCost {
+			continue
+		}
+		if cfg.TraceName != "" && cfg.TraceName != "*" && at.TraceName != cfg.TraceName {
+			continue
+		}
+
+		dedupKey := fmt.Sprintf("ai_cost:%d:%s", rule.Id, at.TraceName)
+		if dedup.isDuplicate(dedupKey, time.Duration(rule.CooldownMinutes)*time.Minute) {
+			continue
+		}
+		dedup.record(dedupKey)
+
+		msg := buildAiTraceCostMessage(at.TraceName, at.TotalCost, cfg.ThresholdCost, 0, projectName)
+		dispatch(rule, msg)
 	}
 }
 

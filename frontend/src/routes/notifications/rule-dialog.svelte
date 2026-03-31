@@ -79,6 +79,8 @@
 	let baselineWindowMinutes = $state(60);
 	let ignorePatterns = $state('');
 	let includeArchived = $state(true);
+	let traceName = $state('*');
+	let thresholdCost = $state(0.5);
 
 	const isEditing = $derived(rule !== null);
 
@@ -98,7 +100,8 @@
 		{ value: 'no_data', label: 'No Data' },
 		{ value: 'task_duration_threshold', label: 'Task Duration' },
 		{ value: 'task_failure_rate', label: 'Task Failure Rate' },
-		{ value: 'throughput_drop', label: 'Throughput Drop' }
+		{ value: 'throughput_drop', label: 'Throughput Drop' },
+		{ value: 'ai_trace_cost', label: 'AI Trace Cost' }
 	];
 
 	const ruleTypeDescriptions: Record<string, string> = {
@@ -109,7 +112,9 @@
 		impact_score_high:
 			'Fires when an endpoint\u2019s impact score reaches high level (\u2265 0.50), indicating significant performance or reliability issues.',
 		impact_score_medium:
-			'Fires when an endpoint\u2019s impact score reaches medium level (\u2265 0.25), an early warning of emerging performance or reliability issues.'
+			'Fires when an endpoint\u2019s impact score reaches medium level (\u2265 0.25), an early warning of emerging performance or reliability issues.',
+		ai_trace_cost:
+			'Fires when an individual AI trace exceeds a cost threshold. Monitors per-call spending across AI providers.'
 	};
 
 	const operatorOptions = [
@@ -164,6 +169,8 @@
 		baselineWindowMinutes = 60;
 		ignorePatterns = '';
 		includeArchived = true;
+		traceName = '*';
+		thresholdCost = 0.5;
 	}
 
 	function populateFromRule(r: NotificationRule) {
@@ -239,6 +246,10 @@
 			case 'impact_score_medium':
 				minRequests = cfg.minRequests ?? 50;
 				break;
+			case 'ai_trace_cost':
+				traceName = cfg.traceName ?? '*';
+				thresholdCost = cfg.thresholdCost ?? 0.5;
+				break;
 		}
 	}
 
@@ -278,6 +289,8 @@
 			case 'impact_score_high':
 			case 'impact_score_medium':
 				return { minRequests };
+			case 'ai_trace_cost':
+				return { traceName, thresholdCost };
 			default:
 				return {};
 		}
@@ -390,6 +403,7 @@
 						<Select.Item value="impact_score_critical">Impact Score Critical</Select.Item>
 						<Select.Item value="impact_score_high">Impact Score High</Select.Item>
 						<Select.Item value="impact_score_medium">Impact Score Medium</Select.Item>
+						<Select.Item value="ai_trace_cost">AI Trace Cost</Select.Item>
 						<!-- <Select.Separator />
 						<Select.Item value="error_regression">Error Regression</Select.Item>
 						<Select.Item value="error_rate_threshold">Error Rate</Select.Item>
@@ -744,6 +758,25 @@
 							type="number"
 							bind:value={minRequests}
 							min="1"
+						/>
+					</div>
+				{:else if ruleType === 'ai_trace_cost'}
+					<div class="space-y-2">
+						<Label for="cfg-trace-name">Trace Name (* for all)</Label>
+						<Input
+							id="cfg-trace-name"
+							bind:value={traceName}
+							placeholder="Customer Support Agent"
+						/>
+					</div>
+					<div class="space-y-2">
+						<Label for="cfg-threshold-cost">Cost Threshold ($)</Label>
+						<Input
+							id="cfg-threshold-cost"
+							type="number"
+							bind:value={thresholdCost}
+							step="0.01"
+							min="0"
 						/>
 					</div>
 				{/if}

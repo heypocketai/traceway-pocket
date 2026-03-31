@@ -33,6 +33,7 @@ var validRuleTypes = map[string]bool{
 	"impact_score_critical":   true,
 	"impact_score_high":       true,
 	"impact_score_medium":     true,
+	"ai_trace_cost":           true,
 }
 
 func (ctrl *notificationRuleController) List(ctx *gin.Context) {

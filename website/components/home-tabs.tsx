@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Server, Monitor, Network, Workflow, ArrowRight } from "lucide-react";
+import { Server, Monitor, Network, Workflow, Radio, ArrowRight } from "lucide-react";
 
 const tabs = [
   {
@@ -76,6 +76,24 @@ const tabs = [
       "Works with OpenRouter and any OTel provider",
     ],
     href: "/product/ai-tracing",
+  },
+  {
+    id: "iot",
+    label: "IoT",
+    icon: Radio,
+    iconBg: "bg-amber-50",
+    iconColor: "text-amber-600",
+    dotColor: "bg-amber-500",
+    heading: "Monitor fleets of devices at scale.",
+    description:
+      "Traceway's OpenTelemetry-native ingestion and ClickHouse columnar storage handle high-volume telemetry from IoT devices efficiently. Enterprise pricing supports large device fleets with predictable, fixed costs — no per-event billing surprises.",
+    bullets: [
+      "High-volume ingestion via OTLP/HTTP",
+      "ClickHouse compression keeps storage costs low",
+      "Enterprise pricing for large device fleets",
+      "Custom metrics for device health and telemetry",
+    ],
+    href: "/cloud",
   },
 ];
 

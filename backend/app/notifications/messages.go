@@ -152,6 +152,26 @@ func buildImpactScoreMediumMessage(endpoint string, score float64, reason string
 	}
 }
 
+func formatCostForMessage(cost float64) string {
+	if cost < 0.01 {
+		return fmt.Sprintf("$%.4f", cost)
+	}
+	return fmt.Sprintf("$%.2f", cost)
+}
+
+func buildAiTraceCostMessage(traceName string, cost float64, threshold float64, window int, projectName string) Message {
+	severity := SeverityWarning
+	if cost >= threshold*3 {
+		severity = SeverityCritical
+	}
+	return Message{
+		Subject:  fmt.Sprintf("[%s] AI trace %s cost %s exceeds %s", projectName, traceName, formatCostForMessage(cost), formatCostForMessage(threshold)),
+		Body:     fmt.Sprintf("The AI trace \"%s\" cost %s in the last %d minutes (threshold: %s).", traceName, formatCostForMessage(cost), window, formatCostForMessage(threshold)),
+		Severity: severity,
+		URL:      "/ai-traces?preset=1h",
+	}
+}
+
 type ExceptionDetails struct {
 	Id         string
 	Hash       string

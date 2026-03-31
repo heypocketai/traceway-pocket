@@ -6,6 +6,11 @@ import (
 	"github.com/google/uuid"
 )
 
+type AiTraceInfo struct {
+	TraceName string
+	TotalCost float64
+}
+
 type ReportEvent struct {
 	OrganizationId  int
 	ProjectId       uuid.UUID
@@ -14,6 +19,7 @@ type ReportEvent struct {
 	TaskCount       int
 	RecordingCount  int
 	ExceptionHashes []string
+	AiTraces        []AiTraceInfo
 }
 
 var (

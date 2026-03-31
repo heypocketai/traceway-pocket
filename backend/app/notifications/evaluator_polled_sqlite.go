@@ -805,3 +805,4 @@ func evaluateImpactScoreHigh(ctx context.Context, rule *models.NotificationRule,
 func evaluateImpactScoreMedium(ctx context.Context, rule *models.NotificationRule, projectId uuid.UUID) (*EvalResult, error) {
 	return evaluateImpactScore(ctx, rule, projectId, 0.25, buildImpactScoreMediumMessage)
 }
+

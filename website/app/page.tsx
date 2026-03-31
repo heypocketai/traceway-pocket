@@ -24,7 +24,6 @@ import {
   GitCompare,
   Workflow,
 } from "lucide-react";
-import { CodeTabs } from "@/components/code-tabs";
 import { ImpactScoreVisual } from "@/components/impact-score-visual";
 import { CostComparison } from "@/components/cost-comparison";
 import { DockerCommand } from "@/components/docker-command";
@@ -277,7 +276,7 @@ export default function Home() {
       </section>
 
       {/* Section 6: Use Case Tabs */}
-      <section className="py-20 bg-white border-b border-zinc-100">
+      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
         <div className="container mx-auto px-4 max-w-5xl">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
@@ -293,7 +292,7 @@ export default function Home() {
       </section>
 
       {/* Section: AI Tracing */}
-      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
+      <section className="py-20 bg-white border-b border-zinc-100">
         <div className="container mx-auto px-4 max-w-5xl">
           <div className="flex flex-col md:flex-row items-center gap-12 lg:gap-20">
             <div className="flex-1 space-y-6">
@@ -301,7 +300,7 @@ export default function Home() {
                 <Workflow className="w-6 h-6 text-violet-600" />
               </div>
               <h3 className="text-2xl md:text-3xl font-bold text-zinc-900 tracking-tight">
-                AI Tracing for LLM observability
+                AI Tracing for Agent observability
               </h3>
               <p className="text-zinc-600 text-lg leading-relaxed">
                 Monitor every AI call with full cost, token usage, latency, and conversation tracking.
@@ -345,7 +344,7 @@ export default function Home() {
       </section>
 
       {/* Section 7: Open Source & Self-Hosting */}
-      <section className="py-20 bg-white border-b border-zinc-100">
+      <section className="py-20 bg-zinc-50/50 border-b border-zinc-100">
         <div className="container mx-auto px-4 max-w-5xl">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
@@ -405,32 +404,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Section 8: Quick Integration */}
-      <section className="py-16 bg-white border-b border-zinc-100">
-        <div className="container mx-auto px-4 max-w-5xl">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-12">
-            <div className="flex-1 space-y-4">
-              <h2 className="text-2xl font-bold tracking-tight text-zinc-900">
-                No OpenTelemetry? No Problem!
-              </h2>
-              <h3 className="text-xl italic text-zinc-700">
-                Two lines of code. That&apos;s it.
-              </h3>
-              <p className="text-zinc-600 text-base leading-relaxed max-w-md">
-                Add the middleware to your router and start collecting
-                actionable telemetry instantly. No complex configuration
-                required.
-              </p>
-            </div>
-            <div className="flex-1 w-full max-w-lg">
-              <CodeTabs />
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Section 9: Demo CTA */}
-      <section className="py-8 bg-zinc-50/50 border-b border-zinc-100">
+      <section className="py-8 bg-white border-b border-zinc-100">
         <div className="container mx-auto px-4 max-w-3xl text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-zinc-900 tracking-tight">
             See it in action
