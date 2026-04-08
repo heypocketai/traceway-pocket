@@ -142,6 +142,21 @@ if (span) {
 }
 ```
 
+## What Gets Auto-Instrumented vs Manual
+
+| Operation | Auto-Instrumented? | Notes |
+|-----------|-------------------|-------|
+| HTTP requests (incoming) | Yes | Via `instrumentation-http` + `instrumentation-express` |
+| `http.route` grouping | Yes | Express instrumentation sets this automatically |
+| Thrown exceptions | Yes | Recorded as Issues with stack traces |
+| Outgoing `fetch()` calls | Yes | Via `instrumentation-undici` |
+| Prisma queries | Yes | Via `@prisma/instrumentation` (install separately) |
+| Database queries (`pg`, `mysql2`, `mongodb`) | Yes | CJS packages — patched by `require-in-the-middle` |
+| Cache (`redis`, `ioredis`) | Yes | CJS packages — patched automatically |
+| NestJS handlers | Yes | Via `instrumentation-nestjs-core` |
+| Custom business logic | No | Use `tracer.startActiveSpan()` or `@Span()` decorator |
+| SQLite (`better-sqlite3`) | No | Use manual spans |
+
 ## Next Steps
 
 - [Quick Start](/client/nestjs) — setup and auto-instrumentation

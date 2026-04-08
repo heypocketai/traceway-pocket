@@ -8,7 +8,14 @@ Instrument your NestJS application with OpenTelemetry and export traces and metr
 npm install @opentelemetry/sdk-node \
   @opentelemetry/auto-instrumentations-node \
   @opentelemetry/exporter-trace-otlp-http \
-  @opentelemetry/exporter-metrics-otlp-http
+  @opentelemetry/exporter-metrics-otlp-http \
+  @opentelemetry/api
+```
+
+If you use Prisma, also install its OTel instrumentation for automatic query tracing:
+
+```bash
+npm install @prisma/instrumentation
 ```
 
 ## Setup
@@ -48,45 +55,77 @@ const sdk = new NodeSDK({
 sdk.start();
 ```
 
+> If you use Prisma, add `import { PrismaInstrumentation } from "@prisma/instrumentation"` and include `new PrismaInstrumentation()` in the `instrumentations` array alongside `getNodeAutoInstrumentations()`.
+
 ## Running Your App
 
 The instrumentation file must load **before** NestJS boots. Use the `--require` flag:
 
 ```bash
-# Development
-node --require ./instrumentation.js -e "require('./dist/main.js')"
-
-# Or with ts-node
+# Development (with ts-node)
 node --require ts-node/register --require ./instrumentation.ts src/main.ts
 
-# Or set via environment variable
-export NODE_OPTIONS="--require ./instrumentation.js"
-npm run start
+# Production (compiled JS)
+node --require ./instrumentation.js dist/main.js
 ```
 
-If you use the NestJS CLI (`nest start`), set `NODE_OPTIONS` in your environment or add a custom script to `package.json`:
+Add these as scripts in `package.json`:
 
 ```json
 {
   "scripts": {
-    "start:traced": "NODE_OPTIONS='--require ./instrumentation.js' nest start"
+    "start": "node --require ./instrumentation.js dist/main.js",
+    "start:dev": "node --require ts-node/register --require ./instrumentation.ts src/main.ts"
   }
 }
 ```
 
-## What Gets Auto-Instrumented
+If you use the NestJS CLI (`nest start`), set `NODE_OPTIONS` in your environment:
 
-OTel auto-instrumentation for Node.js captures the following without any code changes:
+```bash
+export NODE_OPTIONS="--require ./instrumentation.js"
+npm run start
+```
+
+## What Gets Captured
+
+NestJS uses Express (or Fastify) under the hood — both are CJS packages that OTel auto-instrumentation patches successfully. The following is captured automatically:
 
 | Layer | What's Captured |
 |-------|-----------------|
 | HTTP (Express/Fastify) | Incoming requests with route, method, status code, duration |
-| Database (TypeORM, Prisma, pg, mysql2) | Query spans with SQL statements |
-| Redis / ioredis | Cache operation spans |
-| HTTP client (axios, fetch) | Outgoing HTTP request spans |
-| gRPC | gRPC call spans |
+| NestJS handlers | Controller method spans via `instrumentation-nestjs-core` |
+| `http.route` | Parameterized routes (e.g., `GET /api/users/:id`) — set automatically |
+| Exceptions | Thrown errors recorded as Issues with stack traces |
+| Prisma (`@prisma/instrumentation`) | Query spans with operation name, model, duration |
+| Database (`pg`, `mysql2`, `mongodb`) | Query spans with SQL statements |
+| Cache (`redis`, `ioredis`) | Cache operation spans |
+| Outgoing `fetch()` | Outgoing HTTP request spans (auto via `instrumentation-undici`) |
+| Outgoing HTTP (`axios`) | Outgoing request spans |
+| DNS | DNS lookup spans |
 
-NestJS uses Express (or Fastify) under the hood, so all HTTP requests are automatically traced as **Endpoints** in Traceway.
+Root SERVER spans become **Endpoints** in Traceway, child spans become **Spans**, and exception events become **Issues**.
+
+### Why NestJS doesn't need a route helper
+
+Unlike Hono and Next.js, NestJS uses Express (or Fastify) internally. The `@opentelemetry/instrumentation-express` package automatically sets `http.route` on the root HTTP span. Endpoint grouping works out of the box — `GET /api/users/1` and `GET /api/users/2` are grouped as `GET /api/users/:id` without any extra code.
+
+### Prisma Auto-Instrumentation
+
+With `@prisma/instrumentation` registered in the SDK, every Prisma query automatically creates child spans:
+
+```typescript
+// Just use Prisma normally — spans are created automatically
+const users = await this.prismaService.user.findMany();
+const user = await this.prismaService.user.create({ data: { name, email } });
+```
+
+The resulting trace in Traceway:
+
+```
+GET /api/users              ← Endpoint
+  └─ prisma:client:query    ← Span (findMany on User)
+```
 
 ## Environment Variable Alternative
 
@@ -105,7 +144,7 @@ Add a test endpoint:
 ```typescript
 import { Controller, Get } from "@nestjs/common";
 
-@Controller()
+@Controller("api")
 export class AppController {
   @Get("test-error")
   testError() {
@@ -114,7 +153,7 @@ export class AppController {
 }
 ```
 
-Visit `/test-error` and check your Traceway dashboard — the error should appear under **Issues** with a full stack trace.
+Visit `/api/test-error` and check your Traceway dashboard — the error should appear under **Issues** with a full stack trace.
 
 ## Next Steps
 

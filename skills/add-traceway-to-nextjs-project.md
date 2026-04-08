@@ -215,6 +215,41 @@ After completing steps 1-6, the following produces traces with zero additional c
 | MongoDB queries | `instrumentation-mongodb` (auto) | **Span** (child) |
 | Redis operations (`ioredis`) | `instrumentation-ioredis` (auto) | **Span** (child) |
 
+## Instrumenting Background Tasks (Optional)
+
+Next.js has no built-in scheduler. If your app runs cron jobs or queue consumers (via `node-cron`, `bullmq`, or triggered by an external scheduler like Vercel Cron), wrap them with `SpanKind.CONSUMER` so they appear as **Tasks** in Traceway:
+
+```typescript
+import { trace, SpanKind, SpanStatusCode } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("my-nextjs-app");
+
+// e.g., in an API route triggered by a cron scheduler
+export const POST = withRoute("/api/cron/cleanup", async () => {
+  return tracer.startActiveSpan(
+    "cleanup-expired-sessions",
+    { kind: SpanKind.CONSUMER },
+    async (span) => {
+      try {
+        await prisma.session.deleteMany({
+          where: { expiresAt: { lt: new Date() } },
+        });
+        span.setStatus({ code: SpanStatusCode.OK });
+        span.end();
+        return Response.json({ status: "ok" });
+      } catch (error) {
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+        span.end();
+        throw error;
+      }
+    }
+  );
+});
+```
+
+Without `SpanKind.CONSUMER`, background work would be classified as an Endpoint or dropped.
+
 ## Adding Manual Spans (Optional)
 
 For operations without auto-instrumentation (SQLite, Server Components, custom business logic):

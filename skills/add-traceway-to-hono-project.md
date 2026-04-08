@@ -204,6 +204,39 @@ app.get("/api/users", (c) => {
 });
 ```
 
+## Instrumenting Background Tasks (Optional)
+
+Hono has no built-in scheduler. If your app runs cron jobs or queue consumers (via `node-cron`, `bullmq`, etc.), wrap them with `SpanKind.CONSUMER` so they appear as **Tasks** in Traceway:
+
+```javascript
+import { trace, SpanKind, SpanStatusCode } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("my-app");
+
+// In your cron/queue handler
+async function processQueueJob(job) {
+  await tracer.startActiveSpan(
+    "process-email-queue",
+    { kind: SpanKind.CONSUMER },
+    async (span) => {
+      try {
+        span.setAttribute("job.id", job.id);
+        await sendEmail(job.data);
+        span.setStatus({ code: SpanStatusCode.OK });
+      } catch (error) {
+        span.recordException(error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        throw error;
+      } finally {
+        span.end();
+      }
+    }
+  );
+}
+```
+
+Without `SpanKind.CONSUMER`, background work would be dropped or misclassified as an Endpoint.
+
 ## Recording Caught Exceptions (Optional)
 
 `@hono/otel` auto-records thrown errors. For errors you catch and handle:
