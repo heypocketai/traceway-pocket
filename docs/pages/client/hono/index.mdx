@@ -5,7 +5,7 @@ Instrument your Hono application with OpenTelemetry and export traces and metric
 ## Installation
 
 ```bash
-npm install hono @hono/node-server \
+npm install hono @hono/node-server @hono/otel \
   @opentelemetry/sdk-node \
   @opentelemetry/auto-instrumentations-node \
   @opentelemetry/exporter-trace-otlp-http \
@@ -22,14 +22,8 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { Resource } from "@opentelemetry/resources";
 
 const sdk = new NodeSDK({
-  resource: new Resource({
-    "service.name": "my-hono-app",
-    "service.version": "1.0.0",
-  }),
-
   traceExporter: new OTLPTraceExporter({
     url: "https://your-traceway-instance.com/api/otel/v1/traces",
     headers: { Authorization: "Bearer your-project-token" },
@@ -43,81 +37,31 @@ const sdk = new NodeSDK({
     exportIntervalMillis: 30_000,
   }),
 
-  instrumentations: [getNodeAutoInstrumentations()],
+  // Disable instrumentation-http — @hono/otel handles HTTP spans at the middleware level
+  instrumentations: [
+    getNodeAutoInstrumentations({
+      "@opentelemetry/instrumentation-http": { enabled: false },
+    }),
+  ],
 });
 
 sdk.start();
 ```
 
-## Route & Error Middleware (Required)
-
-Hono has no dedicated OTel instrumentation package, so two pieces are missing that you must add manually:
-
-1. **Route middleware** — Without it, Traceway falls back to the literal URL path (e.g., `/api/users/1`, `/api/users/2`) instead of grouping requests by route pattern (`GET /api/users/:id`).
-2. **Error handler** — Hono catches errors before they reach the HTTP layer, so OTel never sees them. Without an explicit handler, errors won't appear as Issues in Traceway.
-
-### Route Middleware
-
-Register this middleware **before** your route handlers. It runs after the handler completes (`await next()`), reads the matched route pattern via `c.req.routePath`, and sets `http.route` on the active OTel span:
-
-```typescript
-import { trace } from "@opentelemetry/api";
-
-app.use("*", async (c, next) => {
-  await next();
-  const span = trace.getActiveSpan();
-  if (span) {
-    span.setAttribute("http.route", c.req.routePath);
-  }
-});
-```
-
-### Error Handler
-
-Record exceptions on the active span so they appear as Issues in Traceway:
-
-```typescript
-import { trace, SpanStatusCode } from "@opentelemetry/api";
-
-app.onError((err, c) => {
-  const span = trace.getActiveSpan();
-  if (span) {
-    span.recordException(err);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
-  }
-  return c.json({ error: "Internal Server Error" }, 500);
-});
-```
+> **Why disable `instrumentation-http`?** Hono uses `@hono/node-server`, which imports Node's `http` module via ESM. On Node.js 22+, OTel's `import-in-the-middle` hook cannot intercept ESM imports of built-in modules, so `instrumentation-http` never patches the server — no spans are created. The [`@hono/otel`](https://www.npmjs.com/package/@hono/otel) middleware solves this by creating spans at the Hono middleware level instead, which works on all Node.js versions and runtimes.
 
 ## Application Code
 
-Here's a complete example with the route middleware and error handler in place:
+The `@hono/otel` middleware handles everything automatically — endpoint grouping via `http.route`, status codes, and exception recording:
 
 ```typescript
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { trace, SpanStatusCode } from "@opentelemetry/api";
+import { otel } from "@hono/otel";
 
 const app = new Hono();
 
-// Route middleware — sets http.route for endpoint grouping
-app.use("*", async (c, next) => {
-  await next();
-  const span = trace.getActiveSpan();
-  if (span) {
-    span.setAttribute("http.route", c.req.routePath);
-  }
-});
-
-// Error handler — records exceptions as Issues
-app.onError((err, c) => {
-  const span = trace.getActiveSpan();
-  if (span) {
-    span.recordException(err);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
-  }
-  return c.json({ error: "Internal Server Error" }, 500);
-});
+app.use(otel());
 
 app.get("/api/users", (c) => {
   return c.json({ users: [] });
@@ -152,17 +96,52 @@ node server.js
 
 ## What Gets Captured
 
-Hono on Node.js uses `@hono/node-server`, which creates a standard Node.js HTTP server. With the route middleware and error handler from above, OTel captures:
+With `@hono/otel` and the auto-instrumentations enabled, the following is captured automatically:
 
 | Layer | What's Captured |
 |-------|-----------------|
-| HTTP server | Incoming requests with method, status code, duration |
-| Route middleware | `http.route` for endpoint grouping (e.g., `GET /api/users/:id`) |
-| Error handler | Exceptions recorded as Issues with stack traces |
-| HTTP client (fetch) | Outgoing HTTP request spans |
-| Database (pg, mysql2, etc.) | Query spans |
+| `@hono/otel` middleware | Incoming requests with method, route, status code, duration |
+| `@hono/otel` middleware | `http.route` for endpoint grouping (e.g., `GET /api/users/:id`) |
+| `@hono/otel` middleware | Exceptions recorded as Issues with stack traces |
+| Database (`pg`, `mysql2`, `mongodb`) | Query spans with SQL statements, connection info |
+| Cache (`redis`, `ioredis`) | Cache operation spans |
+| Outgoing `fetch()` | Outgoing HTTP request spans (auto via `instrumentation-undici`) |
+| DNS | DNS lookup spans |
 
 Root SERVER spans become **Endpoints** in Traceway, child spans become **Spans**, and exception events become **Issues**.
+
+### Database Auto-Instrumentation
+
+Database libraries like `pg`, `mysql2`, `mongodb`, and `ioredis` are CommonJS packages. Even in an ESM Hono app, OTel's `require-in-the-middle` hook patches them successfully. Database queries automatically appear as child spans under the `@hono/otel` root span — no manual instrumentation needed:
+
+```typescript
+import pg from "pg";
+import { otel } from "@hono/otel";
+
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const app = new Hono();
+
+app.use(otel());
+
+app.get("/api/users/:id", async (c) => {
+  const id = c.req.param("id");
+  // This query automatically creates a child span:
+  //   pg.query → SELECT * FROM users WHERE id = $1
+  const { rows } = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
+  return c.json(rows[0]);
+});
+```
+
+The resulting trace in Traceway:
+
+```
+GET /api/users/:id          ← Endpoint (from @hono/otel)
+  └─ pg.query               ← Span (from instrumentation-pg)
+      ├─ dns.lookup          ← Span (from instrumentation-dns)
+      └─ tcp.connect         ← Span (from instrumentation-net)
+```
+
+> **Note:** This works because `pg`, `mysql2`, and similar packages use CommonJS internally. The ESM import issue that affects `http` (a Node.js built-in) does not affect third-party CJS npm packages.
 
 ## Environment Variable Alternative
 
@@ -195,6 +174,6 @@ Visit `/test-error` and check your Traceway dashboard — the error should appea
 
 ## Next Steps
 
-- [Traces](/client/hono/traces) — manual spans and middleware instrumentation
+- [Traces](/client/hono/traces) — manual spans, middleware instrumentation, and exception recording
 - [Node.js OTel Guide](/client/node-sdk) — general Node.js setup details
 - [OTel Overview](/client/otel) — protocol details and authentication

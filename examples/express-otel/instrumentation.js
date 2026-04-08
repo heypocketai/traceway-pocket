@@ -5,7 +5,7 @@ import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 
 const tracewayUrl = process.env.TRACEWAY_URL || "http://localhost:8082";
-const tracewayToken = process.env.TRACEWAY_TOKEN || "";
+const tracewayToken = process.env.TRACEWAY_TOKEN || "backend-dev-token";
 
 const sdk = new NodeSDK({
   serviceName: "express-otel-example",

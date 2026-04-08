@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	tracewaybackend "github.com/tracewayapp/traceway/backend"
 	traceway "go.tracewayapp.com"
-	tracewaygin "go.tracewayapp.com/tracewaygin"
 )
 
 //go:embed index.html
@@ -40,7 +39,6 @@ func main() {
 		tracewaybackend.WithDefaultProject("jQuery Frontend", "jquery", frontendToken),
 		tracewaybackend.WithDefaultProject("Traceway Monitoring", "go", monitoringToken),
 		tracewaybackend.WithMonitoringURL(monitoringToken+"@http://localhost:8082/api/report"),
-		tracewaybackend.DisableLogging(),
 	)
 
 	router := gin.Default()
@@ -60,10 +58,10 @@ func main() {
 		c.Next()
 	})
 
-	router.Use(tracewaygin.New(
-		backendToken+"@http://localhost:8082/api/report",
-		tracewaygin.WithOnErrorRecording(tracewaygin.RecordingQuery|tracewaygin.RecordingBody|tracewaygin.RecordingHeader|tracewaygin.RecordingUrl),
-	))
+	// router.Use(tracewaygin.New(
+	// 	backendToken+"@http://localhost:8082/api/report",
+	// 	tracewaygin.WithOnErrorRecording(tracewaygin.RecordingQuery|tracewaygin.RecordingBody|tracewaygin.RecordingHeader|tracewaygin.RecordingUrl),
+	// ))
 
 	router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)

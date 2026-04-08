@@ -9,11 +9,11 @@ const users = [
   { id: "3", name: "Charlie", email: "charlie@example.com" },
 ];
 
-app.get("/api/users", (req, res) => {
+app.get("/express/api/users", (req, res) => {
   res.json(users);
 });
 
-app.get("/api/users/:id", (req, res) => {
+app.get("/express/api/users/:id", (req, res) => {
   const user = users.find((u) => u.id === req.params.id);
   if (!user) {
     return res.status(404).json({ error: "User not found" });
@@ -21,19 +21,19 @@ app.get("/api/users/:id", (req, res) => {
   res.json(user);
 });
 
-app.post("/api/users", (req, res) => {
+app.post("/express/api/users", (req, res) => {
   const newUser = { id: String(users.length + 1), ...req.body };
   users.push(newUser);
   res.status(201).json(newUser);
 });
 
-app.get("/api/slow", async (req, res) => {
+app.get("/express/api/slow", async (req, res) => {
   await new Promise((resolve) => setTimeout(resolve, 300));
   res.json({ message: "Slow response" });
 });
 
-app.get("/api/test-error", () => {
-  throw new Error("Test error from Traceway integration");
+app.get("/express/api/test-error", () => {
+  throw new Error("Test error from Express");
 });
 
 app.listen(3001, () => {

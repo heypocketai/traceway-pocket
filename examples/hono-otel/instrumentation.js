@@ -5,12 +5,9 @@ import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 
 const tracewayUrl = process.env.TRACEWAY_URL || "http://localhost:8082";
-const tracewayToken = process.env.TRACEWAY_TOKEN || "";
+const tracewayToken = process.env.TRACEWAY_TOKEN || "backend-dev-token";
 
 const sdk = new NodeSDK({
-  serviceName: "hono-otel-example",
-  serviceVersion: "1.0.0",
-
   traceExporter: new OTLPTraceExporter({
     url: `${tracewayUrl}/api/otel/v1/traces`,
     headers: { Authorization: `Bearer ${tracewayToken}` },
@@ -24,7 +21,13 @@ const sdk = new NodeSDK({
     exportIntervalMillis: 10_000,
   }),
 
-  instrumentations: [getNodeAutoInstrumentations()],
+  // Disable instrumentation-http — @hono/otel handles HTTP spans at the middleware level.
+  // Keep other auto-instrumentations (database, redis, fetch, etc.)
+  instrumentations: [
+    getNodeAutoInstrumentations({
+      "@opentelemetry/instrumentation-http": { enabled: false },
+    }),
+  ],
 });
 
 sdk.start();

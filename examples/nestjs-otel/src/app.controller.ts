@@ -6,7 +6,7 @@ const users = [
   { id: "3", name: "Charlie", email: "charlie@example.com" },
 ];
 
-@Controller("api")
+@Controller("nestjs/api")
 export class AppController {
   @Get("users")
   getUsers() {

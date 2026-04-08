@@ -7,7 +7,7 @@ const users = [
 ];
 
 export const GET = withRoute(
-  "/api/users/[id]",
+  "/nextjs/api/users/[id]",
   async (req, { params }) => {
     const { id } = await params;
     const user = users.find((u) => u.id === id);

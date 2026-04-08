@@ -5,19 +5,19 @@ export default function Home() {
       <p>Test endpoints:</p>
       <ul>
         <li>
-          <a href="/api/users">GET /api/users</a>
+          <a href="/nextjs/api/users">GET /nextjs/api/users</a>
         </li>
         <li>
-          <a href="/api/users/1">GET /api/users/1</a>
+          <a href="/nextjs/api/users/1">GET /nextjs/api/users/1</a>
         </li>
         <li>
-          <a href="/api/users/2">GET /api/users/2</a>
+          <a href="/nextjs/api/users/2">GET /nextjs/api/users/2</a>
         </li>
         <li>
-          <a href="/api/slow">GET /api/slow</a>
+          <a href="/nextjs/api/slow">GET /nextjs/api/slow</a>
         </li>
         <li>
-          <a href="/api/test-error">GET /api/test-error</a>
+          <a href="/nextjs/api/test-error">GET /nextjs/api/test-error</a>
         </li>
       </ul>
     </div>

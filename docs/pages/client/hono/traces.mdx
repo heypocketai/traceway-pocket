@@ -1,10 +1,10 @@
 # Traces
 
-Auto-instrumentation handles HTTP request tracing automatically. This page covers manual spans and Hono middleware instrumentation.
+The `@hono/otel` middleware automatically traces all HTTP requests. Database queries from CJS libraries (`pg`, `mysql2`, `mongodb`, `ioredis`) are also auto-instrumented. This page covers manual spans for operations that aren't covered by auto-instrumentation.
 
 ## Manual Spans
 
-Use `@opentelemetry/api` to create custom spans for operations that aren't auto-instrumented:
+Use `@opentelemetry/api` to create custom spans for operations that aren't auto-instrumented. These spans automatically become children of the `@hono/otel` root span:
 
 ```typescript
 import { trace, SpanStatusCode } from "@opentelemetry/api";
@@ -61,20 +61,25 @@ app.use("/api/*", addUserContext);
 
 ## Exception Recording
 
-> **Important:** The `app.onError` handler below is required for all Hono + OTel setups. If you followed the [Quick Start](/client/hono), it's already included. Without it, Hono catches errors internally and OTel never records them.
+The `@hono/otel` middleware automatically records thrown errors as exception events on the span — they appear as **Issues** in Traceway with full stack traces.
 
-Capture exceptions on the active span so they appear as Issues in Traceway:
+For cases where you catch an error and want to record it without re-throwing:
 
 ```typescript
 import { trace, SpanStatusCode } from "@opentelemetry/api";
 
-app.onError((err, c) => {
+app.get("/api/checkout", async (c) => {
   const span = trace.getActiveSpan();
-  if (span) {
-    span.recordException(err);
-    span.setStatus({ code: SpanStatusCode.ERROR, message: err.message });
+  try {
+    await processPayment();
+  } catch (error) {
+    if (span) {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+    }
+    return c.json({ error: "Payment failed" }, 500);
   }
-  return c.json({ error: "Internal Server Error" }, 500);
+  return c.json({ status: "ok" });
 });
 ```
 
@@ -101,6 +106,76 @@ async function processPayment(orderId: string) {
   });
 }
 ```
+
+## Outgoing HTTP Requests (Auto-Instrumented)
+
+Outgoing `fetch()` calls are automatically traced by `@opentelemetry/instrumentation-undici` — no manual spans needed:
+
+```typescript
+app.get("/api/external", async (c) => {
+  // This fetch automatically creates a child span with:
+  //   url.full, http.response.status_code, server.address, etc.
+  const res = await fetch("https://api.example.com/data");
+  const data = await res.json();
+  return c.json(data);
+});
+```
+
+The resulting trace in Traceway:
+
+```
+GET /api/external             ← Endpoint (from @hono/otel)
+  └─ GET                      ← Span (from instrumentation-undici)
+                                 url.full = https://api.example.com/data
+                                 http.response.status_code = 200
+```
+
+## SQLite / Custom Database Spans (Manual)
+
+SQLite has no OTel auto-instrumentation. Wrap queries in manual spans:
+
+```typescript
+import { trace, SpanStatusCode } from "@opentelemetry/api";
+
+const tracer = trace.getTracer("my-hono-app");
+
+function dbSpan(name, query, fn) {
+  return tracer.startActiveSpan(name, (span) => {
+    span.setAttribute("db.system", "sqlite");
+    span.setAttribute("db.statement", query);
+    try {
+      const result = fn();
+      span.end();
+      return result;
+    } catch (error) {
+      span.recordException(error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+      span.end();
+      throw error;
+    }
+  });
+}
+
+app.get("/api/users", (c) => {
+  const users = dbSpan("db.query", "SELECT * FROM users", () =>
+    db.prepare("SELECT * FROM users").all()
+  );
+  return c.json(users);
+});
+```
+
+## What Gets Auto-Instrumented vs Manual
+
+| Operation | Auto-Instrumented? | Notes |
+|-----------|-------------------|-------|
+| HTTP requests (incoming) | Yes | Via `@hono/otel` middleware |
+| Outgoing `fetch()` calls | Yes | Via `instrumentation-undici` |
+| Database queries (`pg`, `mysql2`, `mongodb`) | Yes | CJS packages — patched by `require-in-the-middle` |
+| Cache (`redis`, `ioredis`) | Yes | CJS packages — patched automatically |
+| DNS lookups | Yes | Via `instrumentation-dns` |
+| TCP connections | Yes | Via `instrumentation-net` |
+| SQLite (`better-sqlite3`) | No | Use manual spans (see above) |
+| Custom business logic | No | Use `tracer.startActiveSpan()` |
 
 ## Next Steps
 

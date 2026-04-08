@@ -42,3 +42,5 @@ backend/static/dist/
 /docs/.wrangler
 /examples/devtesting-embedded/frontend/node_modules
 /examples/devtesting-embedded/storage
+/examples/express-otel/node_modules
+/examples/hono-otel/node_modules

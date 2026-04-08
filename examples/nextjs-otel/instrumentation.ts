@@ -15,7 +15,7 @@ export async function register() {
     );
 
     const tracewayUrl = process.env.TRACEWAY_URL || "http://localhost:8082";
-    const tracewayToken = process.env.TRACEWAY_TOKEN || "";
+    const tracewayToken = process.env.TRACEWAY_TOKEN || "backend-dev-token";
 
     const { Resource } = await import("@opentelemetry/resources");
 
