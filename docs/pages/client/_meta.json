@@ -23,5 +23,6 @@
   "openrouter": "OpenRouter",
   "otel": "OpenTelemetry",
   "cloudflare": "Cloudflare Workers",
-  "symfony": "Symfony"
+  "symfony": "Symfony",
+  "flutter": "Flutter"
 }

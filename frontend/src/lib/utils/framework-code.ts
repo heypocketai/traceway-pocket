@@ -38,6 +38,8 @@ export function getInstallCommand(framework: Framework): string {
 			return '';
 		case 'opentelemetry':
 			return '';
+		case 'flutter':
+			return 'flutter pub add traceway';
 		case 'custom':
 		default:
 			return base;
@@ -284,6 +286,21 @@ $kernel->terminate($request, $response);`;
 		case 'opentelemetry':
 			return '';
 
+		case 'flutter':
+			return `import 'package:flutter/material.dart';
+import 'package:traceway/traceway.dart';
+
+void main() {
+  Traceway.run(
+    connectionString: '${connectionString}',
+    options: TracewayOptions(
+      screenCapture: true,
+      version: '1.0.0',
+    ),
+    child: MyApp(),
+  );
+}`;
+
 		case 'custom':
 		default:
 			return `package main
@@ -320,6 +337,10 @@ class TestController
     }
 }`;
 	}
+	if (framework === 'flutter') {
+		return `// Trigger a test error
+throw StateError('Test error from Traceway integration');`;
+	}
 	if (framework && isJsFramework(framework)) {
 		return `// Trigger a test error
 throw new Error("Test error from Traceway integration");`;
@@ -332,6 +353,14 @@ throw new Error("Test error from Traceway integration");`;
 export function getTestingRouteCode2(framework?: Framework): string {
 	if (framework === 'symfony') {
 		return '';
+	}
+	if (framework === 'flutter') {
+		return `import 'package:traceway/traceway.dart';
+
+TracewayClient.instance?.captureException(
+  Exception('Test error'),
+  StackTrace.current,
+);`;
 	}
 	if (framework && isJsFramework(framework)) {
 		switch (framework) {
@@ -400,6 +429,7 @@ export function getFrameworkLabel(framework: Framework): string {
 		cloudflare: 'Cloudflare',
 		opentelemetry: 'OpenTelemetry',
 		symfony: 'Symfony',
+		flutter: 'Flutter',
 	};
 	return labels[framework] || framework;
 }
@@ -409,5 +439,6 @@ export function getCodeLanguage(framework: Framework): 'go' | 'javascript' | 'ba
 	if (framework === 'opentelemetry') return 'go';
 	if (framework === 'hono') return 'javascript';
 	if (framework === 'cloudflare') return 'javascript';
+	if (framework === 'flutter') return 'javascript'; // closest to Dart syntax highlighting
 	return isJsFramework(framework) ? 'javascript' : 'go';
 }

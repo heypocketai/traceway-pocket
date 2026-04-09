@@ -1,0 +1,116 @@
+# Flutter Quick Start
+
+Integrate Traceway into your Flutter application with the `traceway` package from pub.dev.
+
+## Installation
+
+```bash
+flutter pub add traceway
+```
+
+## Setup
+
+Use `Traceway.run()` to wrap your app. This initializes the SDK and captures errors automatically:
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:traceway/traceway.dart';
+
+void main() {
+  Traceway.run(
+    connectionString: 'your-token@https://traceway.example.com/api/report',
+    options: TracewayOptions(
+      screenCapture: true,
+      version: '1.0.0',
+    ),
+    child: MyApp(),
+  );
+}
+```
+
+## Capture Errors Manually
+
+```dart
+import 'package:traceway/traceway.dart';
+
+// Capture a caught exception
+try {
+  await riskyOperation();
+} catch (e, st) {
+  TracewayClient.instance?.captureException(e, st);
+}
+
+// Capture a message
+TracewayClient.instance?.captureMessage('User completed onboarding');
+```
+
+## With Options
+
+`TracewayOptions` accepts the following parameters:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `sampleRate` | `double` | `1.0` | Event sampling rate (0.0 to 1.0) |
+| `screenCapture` | `bool` | `false` | Records the last ~10 seconds of screen as video |
+| `debug` | `bool` | `false` | Prints debug info to the console |
+| `version` | `String` | `''` | App version string |
+| `debounceMs` | `int` | `1500` | Milliseconds before sending batched events |
+| `capturePixelRatio` | `double` | `0.5` | Screenshot resolution scale |
+
+```dart
+Traceway.run(
+  connectionString: 'your-token@https://traceway.example.com/api/report',
+  options: TracewayOptions(
+    sampleRate: 0.5,
+    screenCapture: true,
+    debug: true,
+    version: '2.1.0',
+    debounceMs: 2000,
+    capturePixelRatio: 0.75,
+  ),
+  child: MyApp(),
+);
+```
+
+## Screen Recording
+
+When `screenCapture` is set to `true`:
+
+- The SDK wraps the app in a `RepaintBoundary` and captures frames at approximately 15 fps.
+- On exception, the last ~10 seconds are encoded to MP4 and sent alongside the error report.
+- Touch and click positions are rendered as red circles on the captured frames. These overlays are invisible to the user during normal use.
+- Recordings appear in the Traceway dashboard alongside the stack trace, giving you full visual context for every error.
+
+## What Gets Captured Automatically
+
+`Traceway.run()` sets up capture for the following error sources with no additional configuration:
+
+- **Flutter framework errors** — rendering, layout, and gesture errors reported through `FlutterError.onError`.
+- **Platform errors** — native platform channel errors.
+- **Uncaught async errors** — any unhandled exceptions in asynchronous code, captured via Dart's `Zone` mechanism.
+
+## Test Your Integration
+
+Add a button that throws an error to verify everything is wired up:
+
+```dart
+ElevatedButton(
+  onPressed: () {
+    throw StateError('Test error from Traceway');
+  },
+  child: Text('Send Test Error'),
+)
+```
+
+Tap the button and check your Traceway dashboard to verify the error appears.
+
+## Platform Support
+
+| Platform | Error Tracking | Screen Recording |
+|----------|---------------|-----------------|
+| iOS      | Yes           | Yes             |
+| Android  | Yes           | Yes             |
+| macOS    | Yes           | Yes             |
+| Web      | No            | No              |
+
+Flutter web apps should use the [JS SDK](/client/js-sdk) instead.

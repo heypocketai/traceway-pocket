@@ -1,9 +1,9 @@
 import { api } from '$lib/api';
 import { authState } from './auth.svelte';
 
-export type Framework = 'gin' | 'fiber' | 'chi' | 'fasthttp' | 'stdlib' | 'custom' | 'react' | 'svelte' | 'vuejs' | 'nextjs' | 'nestjs' | 'express' | 'remix' | 'jquery' | 'hono' | 'cloudflare' | 'opentelemetry' | 'symfony';
+export type Framework = 'gin' | 'fiber' | 'chi' | 'fasthttp' | 'stdlib' | 'custom' | 'react' | 'svelte' | 'vuejs' | 'nextjs' | 'nestjs' | 'express' | 'remix' | 'jquery' | 'hono' | 'cloudflare' | 'opentelemetry' | 'symfony' | 'flutter';
 
-export const FRONTEND_FRAMEWORKS: Framework[] = ['react', 'svelte', 'vuejs', 'jquery'];
+export const FRONTEND_FRAMEWORKS: Framework[] = ['react', 'svelte', 'vuejs', 'jquery', 'flutter'];
 export const JS_FRAMEWORKS: Framework[] = ['react', 'svelte', 'vuejs', 'nextjs', 'nestjs', 'express', 'remix', 'jquery'];
 
 export const FRAMEWORK_LABELS: Record<Framework, string> = {
@@ -25,10 +25,17 @@ export const FRAMEWORK_LABELS: Record<Framework, string> = {
 	cloudflare: 'Cloudflare',
 	opentelemetry: 'OpenTelemetry',
 	symfony: 'Symfony',
+	flutter: 'Flutter',
 };
+
+export const MOBILE_FRAMEWORKS: Framework[] = ['flutter'];
 
 export function getFrameworkLabel(fw: Framework): string {
 	return FRAMEWORK_LABELS[fw] ?? fw;
+}
+
+export function isMobileFramework(fw: Framework): boolean {
+	return MOBILE_FRAMEWORKS.includes(fw);
 }
 
 export function isFrontendFramework(fw: Framework): boolean {
