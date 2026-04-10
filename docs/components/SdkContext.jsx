@@ -19,7 +19,9 @@ export const SDK_OPTIONS = [
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'otel', label: 'OpenTelemetry (otel)' },
   { value: 'cloudflare', label: 'Cloudflare Workers' },
+  { value: 'js-nextjs', label: 'Next.js (OTel)' },
   { value: 'php-symfony', label: 'Symfony' },
+  { value: 'flutter', label: 'Flutter' },
 ]
 
 const STORAGE_KEY = 'traceway-docs-sdk'
@@ -41,7 +43,9 @@ const PATH_SDK_MAP = {
   'openrouter': 'openrouter',
   'otel': 'otel',
   'cloudflare': 'cloudflare',
+  'nextjs': 'js-nextjs',
   'symfony': 'php-symfony',
+  'flutter': 'flutter',
 }
 
 const SdkContext = createContext({

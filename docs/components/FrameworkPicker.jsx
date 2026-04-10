@@ -89,6 +89,14 @@ const FRAMEWORKS = [
     badge: "new",
   },
   {
+    value: "js-nextjs",
+    label: "Next.js",
+    description: "Next.js applications with OpenTelemetry auto-instrumentation.",
+    icon: "/nextjs.png",
+    href: "/client/nextjs",
+    badge: "new",
+  },
+  {
     value: "js-node",
     label: "Node.js",
     description: "Node.js backend with OpenTelemetry traces and metrics.",
@@ -150,6 +158,14 @@ const FRAMEWORKS = [
     description: "Framework-agnostic JavaScript SDK for browsers.",
     icon: "/javascript.png",
     href: "/client/js-sdk",
+    badge: "new",
+  },
+  {
+    value: "flutter",
+    label: "Flutter",
+    description: "Flutter mobile apps with automatic error capture and screen recording.",
+    icon: "/flutter.png",
+    href: "/client/flutter",
     badge: "new",
   },
 ];

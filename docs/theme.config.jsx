@@ -23,7 +23,9 @@ const SDK_VISIBILITY = {
   openrouter: "openrouter",
   otel: "otel",
   cloudflare: "cloudflare",
+  nextjs: "js-nextjs",
   symfony: "php-symfony",
+  flutter: "flutter",
 };
 
 export default {
