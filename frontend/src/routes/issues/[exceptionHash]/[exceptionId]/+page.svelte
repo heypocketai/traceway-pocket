@@ -31,7 +31,7 @@
 
 
     const isMessage = $derived(occurrence?.isMessage ?? false);
-    const firstLineOfStackTrace = $derived(group?.stackTrace.split('\n')[0] || 'Exception');
+    const firstLineOfStackTrace = $derived(occurrence?.stackTrace.split('\n')[0] || 'Exception');
     const hasMoreOccurrences = $derived(total > 10);
     const subtitleText = $derived(occurrence ? `Event from ${formatDateTime(occurrence.recordedAt, { timezone })}` : 'Loading...');
 
@@ -167,7 +167,7 @@
         />
     {:else if group && occurrence}
         <StackTraceCard
-            stackTrace={group.stackTrace}
+            stackTrace={occurrence.stackTrace}
             {isMessage}
             bind:showArchiveDialog={showArchiveDialog}
             bind:archiving={archiving}
