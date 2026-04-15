@@ -6,7 +6,7 @@
     import { getTimezone } from '$lib/state/timezone.svelte';
     import { formatDateTime } from '$lib/utils/formatters';
     import { StackTraceCard, EventCard, EventsTable, PageHeader } from '$lib/components/issues';
-    import type { ExceptionGroup, ExceptionOccurrence, LinkedTrace } from '$lib/types/exceptions';
+    import type { ExceptionOccurrence, LinkedTrace } from '$lib/types/exceptions';
 	import { createSmartBackHandler } from '$lib/utils/back-navigation';
 	import { resolve } from '$app/paths';
 	import ArchiveConfirmationDialog from '$lib/components/archive-confirmation-dialog.svelte';
@@ -17,7 +17,6 @@
 
     const timezone = $derived(getTimezone());
 
-    let group = $state<ExceptionGroup | null>(null);
     let occurrence = $state<ExceptionOccurrence | null>(null);
     let allOccurrences = $state<ExceptionOccurrence[]>([]);
     let loading = $state(true);
@@ -61,7 +60,6 @@
                 }
             }, { projectId: projectsState.currentProjectId ?? undefined });
 
-            group = response.group;
             allOccurrences = response.occurrences || [];
             total = response.pagination.total;
 
@@ -143,7 +141,7 @@
         onBack={createSmartBackHandler({ fallbackPath: resolve("/issues/[exceptionHash]", {exceptionHash: data.exceptionHash}) })}
     />
 
-    {#if loading && !group}
+    {#if loading && !occurrence}
         <div class="flex items-center justify-center py-20">
             <LoadingCircle size="xlg" />
         </div>
@@ -165,7 +163,7 @@
             backLabel="Back to Exception"
             onRetry={() => loadData()}
         />
-    {:else if group && occurrence}
+    {:else if occurrence}
         <StackTraceCard
             stackTrace={occurrence.stackTrace}
             {isMessage}

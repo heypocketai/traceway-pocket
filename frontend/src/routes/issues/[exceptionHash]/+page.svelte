@@ -34,7 +34,7 @@
 	const latestOccurrence = $derived(occurrences[0]);
 	const isMessage = $derived(latestOccurrence?.isMessage ?? false);
 	const hasMoreOccurrences = $derived(total > 10);
-	const firstLineOfStackTrace = $derived(group?.stackTrace.split('\n')[0] || 'Exception');
+	const firstLineOfStackTrace = $derived(latestOccurrence?.stackTrace.split('\n')[0] || 'Exception');
 
 	async function loadData() {
 		loading = true;
@@ -157,7 +157,7 @@
 		/>
 	{:else if group}
 		<StackTraceCard
-			stackTrace={group.stackTrace}
+			stackTrace={latestOccurrence?.stackTrace ?? group.stackTrace}
 			{isMessage}
 			firstSeen={group.firstSeen}
 			lastSeen={group.lastSeen}
