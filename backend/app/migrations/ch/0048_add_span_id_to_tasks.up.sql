@@ -1,0 +1,1 @@
+ALTER TABLE tasks ADD COLUMN span_id Nullable(UUID) DEFAULT NULL

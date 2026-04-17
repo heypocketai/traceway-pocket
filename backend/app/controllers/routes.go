@@ -36,6 +36,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	otelGroup := router.Group("/otel")
 	otelGroup.POST("/v1/traces", middleware.UseClientAuth, otelcontrollers.OtelController.ExportTraces)
 	otelGroup.POST("/v1/metrics", middleware.UseClientAuth, otelcontrollers.OtelController.ExportMetrics)
+	otelGroup.POST("/v1/logs", middleware.UseClientAuth, otelcontrollers.OtelController.ExportLogs)
 
 	// Project management
 	router.GET("/projects", middleware.UseAppAuth, ProjectController.ListProjects)
@@ -92,6 +93,9 @@ func RegisterControllers(router *gin.RouterGroup) {
 
 	// Distributed traces
 	router.POST("/distributed-traces/:distributedTraceId", middleware.UseAppAuth, DistributedTraceController.GetDistributedTrace)
+
+	// Logs (projectId in body)
+	router.POST("/logs", middleware.UseAppAuth, middleware.RequireProjectAccess, LogController.List)
 
 	// Exceptions (projectId in body)
 	router.POST("/exception-stack-traces", middleware.UseAppAuth, middleware.RequireProjectAccess, ExceptionStackTraceController.FindGrouppedExceptionStackTraces)

@@ -8,6 +8,7 @@
 		Link2,
 		ChartNoAxesCombined,
 		ChartNoAxesGantt,
+		FileText,
 		Gauge,
 		ListEnd,
 		Settings,
@@ -34,6 +35,7 @@
 	const allSidebarItems: SidebarItem[] = [
 		{ Icon: LayoutDashboard, href: '/', title: 'Dashboard', stickyParams: [] },
 		{ Icon: Bug, href: '/issues', title: 'Issues', stickyParams: ['preset', 'from', 'to'] },
+		{ Icon: FileText, href: '/logs', title: 'Logs', stickyParams: ['preset', 'from', 'to'] },
 		{ Icon: Gauge, href: '/endpoints', title: 'Endpoints', stickyParams: ['preset', 'from', 'to'] },
 		{ Icon: ListEnd, href: '/tasks', title: 'Tasks', stickyParams: ['preset', 'from', 'to'] },
 		{ Icon: Workflow, href: '/ai-traces', title: 'AI Traces', stickyParams: ['preset', 'from', 'to'] },

@@ -30,6 +30,7 @@ type endpoint struct {
 	AppVersion         string        `lit:"app_version"`
 	ServerName         string        `lit:"server_name"`
 	DistributedTraceId *uuid.UUID    `lit:"distributed_trace_id"`
+	SpanId             *uuid.UUID    `lit:"span_id"`
 }
 
 type groupedEndpointRow struct {
@@ -96,6 +97,7 @@ func endpointToRow(e models.Endpoint) endpoint {
 		AppVersion:         e.AppVersion,
 		ServerName:         e.ServerName,
 		DistributedTraceId: e.DistributedTraceId,
+		SpanId:             e.SpanId,
 	}
 }
 
@@ -112,6 +114,7 @@ func (r *endpoint) toModel() models.Endpoint {
 		AppVersion:         r.AppVersion,
 		ServerName:         r.ServerName,
 		DistributedTraceId: r.DistributedTraceId,
+		SpanId:             r.SpanId,
 	}
 	if r.Attributes != nil {
 		e.Attributes = map[string]string(r.Attributes)
@@ -332,7 +335,7 @@ func (e *endpointRepository) FindByEndpoint(ctx context.Context, projectId uuid.
 
 func (e *endpointRepository) FindById(ctx context.Context, projectId, endpointId uuid.UUID) (*models.Endpoint, error) {
 	row, err := lit.SelectSingleNamed[endpoint](db.TelemetryDB,
-		`SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id
+		`SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id
 		FROM endpoints WHERE project_id = :project_id AND id = :id LIMIT 1`,
 		lit.P{"project_id": projectId, "id": endpointId})
 	if err != nil {

@@ -26,6 +26,7 @@ type task struct {
 	AppVersion         string        `lit:"app_version"`
 	ServerName         string        `lit:"server_name"`
 	DistributedTraceId *uuid.UUID    `lit:"distributed_trace_id"`
+	SpanId             *uuid.UUID    `lit:"span_id"`
 }
 
 type taskGroupRow struct {
@@ -65,6 +66,7 @@ func taskToRow(t models.Task) task {
 		AppVersion:         t.AppVersion,
 		ServerName:         t.ServerName,
 		DistributedTraceId: t.DistributedTraceId,
+		SpanId:             t.SpanId,
 	}
 }
 
@@ -79,6 +81,7 @@ func (r *task) toModel() models.Task {
 		AppVersion:         r.AppVersion,
 		ServerName:         r.ServerName,
 		DistributedTraceId: r.DistributedTraceId,
+		SpanId:             r.SpanId,
 	}
 	if r.Attributes != nil {
 		t.Attributes = map[string]string(r.Attributes)
@@ -304,7 +307,7 @@ func (e *taskRepository) FindByTaskName(ctx context.Context, projectId uuid.UUID
 
 func (e *taskRepository) FindById(ctx context.Context, projectId, taskId uuid.UUID) (*models.Task, error) {
 	row, err := lit.SelectSingleNamed[task](db.TelemetryDB,
-		`SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id
+		`SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id
 		FROM tasks WHERE project_id = :project_id AND id = :id LIMIT 1`,
 		lit.P{"project_id": projectId, "id": taskId})
 	if err != nil {

@@ -8,8 +8,9 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	colmetricspb "go.opentelemetry.io/proto/otlp/collector/metrics/v1"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -83,6 +84,35 @@ func writeTraceResponse(c *gin.Context) {
 
 func writeMetricsResponse(c *gin.Context) {
 	resp := &colmetricspb.ExportMetricsServiceResponse{}
+	if isProtobuf(c) {
+		data, _ := proto.Marshal(resp)
+		c.Data(http.StatusOK, "application/x-protobuf", data)
+	} else {
+		data, _ := protojson.Marshal(resp)
+		c.Data(http.StatusOK, "application/json", data)
+	}
+}
+
+func decodeLogsRequest(c *gin.Context) (*collogspb.ExportLogsServiceRequest, error) {
+	body, err := readBody(c)
+	if err != nil {
+		return nil, err
+	}
+	req := &collogspb.ExportLogsServiceRequest{}
+	if isProtobuf(c) {
+		if err := proto.Unmarshal(body, req); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
+		}
+	} else {
+		if err := protojson.Unmarshal(body, req); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+		}
+	}
+	return req, nil
+}
+
+func writeLogsResponse(c *gin.Context) {
+	resp := &collogspb.ExportLogsServiceResponse{}
 	if isProtobuf(c) {
 		data, _ := proto.Marshal(resp)
 		c.Data(http.StatusOK, "application/x-protobuf", data)

@@ -18,7 +18,7 @@ import (
 type taskRepository struct{}
 
 func (e *taskRepository) InsertAsync(ctx context.Context, lines []models.Task) error {
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO tasks (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id)")
+	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO tasks (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id)")
 	if err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func (e *taskRepository) InsertAsync(ctx context.Context, lines []models.Task) e
 				attributesJSON = string(attributesBytes)
 			}
 		}
-		if err := batch.Append(t.Id, t.ProjectId, t.TaskName, int64(t.Duration), t.RecordedAt, t.ClientIP, attributesJSON, t.AppVersion, t.ServerName, t.DistributedTraceId); err != nil {
+		if err := batch.Append(t.Id, t.ProjectId, t.TaskName, int64(t.Duration), t.RecordedAt, t.ClientIP, attributesJSON, t.AppVersion, t.ServerName, t.DistributedTraceId, t.SpanId); err != nil {
 			return err
 		}
 	}
@@ -202,7 +202,7 @@ func (e *taskRepository) FindByTaskName(ctx context.Context, projectId uuid.UUID
 
 // FindById returns a single task by ID
 func (e *taskRepository) FindById(ctx context.Context, projectId, taskId uuid.UUID) (*models.Task, error) {
-	query := `SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id
+	query := `SELECT id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id
 		FROM tasks
 		WHERE project_id = ? AND id = ?
 		LIMIT 1`
@@ -212,7 +212,7 @@ func (e *taskRepository) FindById(ctx context.Context, projectId, taskId uuid.UU
 
 	err := chdb.Conn.QueryRow(ctx, query, projectId, taskId).Scan(
 		&t.Id, &t.ProjectId, &t.TaskName, &t.Duration, &t.RecordedAt,
-		&t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId)
+		&t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId, &t.SpanId)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

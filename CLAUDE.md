@@ -515,6 +515,7 @@ backend/
 | POST | `/api/report` | Client | Telemetry ingestion (gzipped) |
 | POST | `/api/otel/v1/traces` | Client | OTLP/HTTP trace ingestion |
 | POST | `/api/otel/v1/metrics` | Client | OTLP/HTTP metric ingestion |
+| POST | `/api/otel/v1/logs` | Client | OTLP/HTTP log ingestion |
 
 **Auth & Registration**
 | Method | Endpoint | Auth | Purpose |
@@ -611,6 +612,11 @@ backend/
 | POST | `/api/invitations/:token/accept` | None | Accept (new user) |
 | POST | `/api/invitations/:token/accept-existing` | App | Accept (existing user) |
 
+**Logs**
+| Method | Endpoint | Auth | Purpose |
+|--------|----------|------|---------|
+| POST | `/api/logs` | App | List/search logs (filters: severity, service, trace, body) |
+
 **Source Maps**
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
@@ -646,6 +652,7 @@ func (c *ReportController) Report(ctx *gin.Context) {
 | `metric_records` | Time-series system metrics | Monthly |
 | `endpoints` | Endpoint aggregates (materialized) | None |
 | `archived_exceptions` | Archived/resolved exceptions | None |
+| `log_records` | OTel logs with 3 attribute maps (resource/scope/log), 30-day TTL | Daily (`toDate(timestamp)`) |
 
 #### Tables (PostgreSQL)
 | Table | Purpose |
