@@ -19,7 +19,7 @@ func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) e
 	}
 
 	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
-		"INSERT INTO spans (id, trace_id, project_id, name, start_time, duration, recorded_at)")
+		"INSERT INTO spans (id, trace_id, project_id, name, start_time, duration, recorded_at, parent_span_id)")
 	if err != nil {
 		return err
 	}
@@ -33,6 +33,7 @@ func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) e
 			s.StartTime,
 			int64(s.Duration),
 			s.RecordedAt,
+			s.ParentSpanId,
 		); err != nil {
 			return err
 		}
@@ -43,7 +44,7 @@ func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) e
 
 func (r *spanRepository) FindByTraceId(ctx context.Context, projectId, traceId uuid.UUID) ([]models.Span, error) {
 	query := `SELECT
-		id, trace_id, project_id, name, start_time, duration, recorded_at
+		id, trace_id, project_id, name, start_time, duration, recorded_at, parent_span_id
 	FROM spans
 	WHERE project_id = ? AND trace_id = ?
 	ORDER BY start_time ASC`
@@ -59,7 +60,7 @@ func (r *spanRepository) FindByTraceId(ctx context.Context, projectId, traceId u
 		var s models.Span
 		if err := rows.Scan(
 			&s.Id, &s.TraceId, &s.ProjectId,
-			&s.Name, &s.StartTime, &s.Duration, &s.RecordedAt,
+			&s.Name, &s.StartTime, &s.Duration, &s.RecordedAt, &s.ParentSpanId,
 		); err != nil {
 			return nil, err
 		}

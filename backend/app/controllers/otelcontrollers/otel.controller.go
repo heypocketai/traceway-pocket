@@ -146,3 +146,39 @@ func (o otelController) ExportMetrics(c *gin.Context) {
 
 	writeMetricsResponse(c)
 }
+
+func (o otelController) ExportLogs(c *gin.Context) {
+	projectId, err := middleware.GetProjectId(c)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("UseClientAuth middleware must be applied: %w", err))
+		return
+	}
+
+	if project, exists := c.Get(middleware.ProjectContextKey); exists {
+		if p, ok := project.(*models.Project); ok && p.OrganizationId != nil {
+			if attrs := traceway.GetAttributesFromContext(c); attrs != nil {
+				attrs.SetTag("organization_id", fmt.Sprintf("%d", *p.OrganizationId))
+			}
+			if !hooks.CanReport(*p.OrganizationId) {
+				c.AbortWithStatus(http.StatusTooManyRequests)
+				return
+			}
+		}
+	}
+
+	req, err := decodeLogsRequest(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	records := convertLogs(projectId, req)
+	if len(records) > 0 {
+		if err := repositories.LogRecordRepository.InsertAsync(c, records); err != nil {
+			c.AbortWithError(500, traceway.NewStackTraceErrorf("error inserting OTEL log records: %w", err))
+			return
+		}
+	}
+
+	writeLogsResponse(c)
+}

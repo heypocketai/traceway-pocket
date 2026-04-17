@@ -17,6 +17,7 @@ type Task struct {
 	AppVersion         string            `json:"appVersion" ch:"app_version"`
 	ServerName         string            `json:"serverName" ch:"server_name"`
 	DistributedTraceId *uuid.UUID        `json:"distributedTraceId,omitempty" ch:"distributed_trace_id"`
+	SpanId             *uuid.UUID        `json:"spanId,omitempty" ch:"span_id"`
 }
 
 type TaskStats struct {

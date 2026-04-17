@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import { Input } from '$lib/components/ui/input';
 	import { Button } from '$lib/components/ui/button';
 	import * as Select from '$lib/components/ui/select';
@@ -15,6 +16,14 @@
 		typeOptions?: TypeOption[];
 		onSearch: () => void;
 		disabled?: boolean;
+		/**
+		 * Optional slot rendered between the type select and the Go button.
+		 * Consumers can drop additional selects in here (e.g. a severity filter)
+		 * so they visually belong to the same compound control. Your content is
+		 * responsible for matching the 9-unit height and using rounded-none +
+		 * border-r-0 to keep the joined look.
+		 */
+		children?: Snippet;
 	};
 
 	let {
@@ -23,7 +32,8 @@
 		typeValue = $bindable(''),
 		typeOptions = [],
 		onSearch,
-		disabled = false
+		disabled = false,
+		children
 	}: Props = $props();
 
 	const typeLabel = $derived(typeOptions.find((o) => o.value === typeValue)?.label ?? '');
@@ -53,6 +63,8 @@
 			</Select.Content>
 		</Select.Root>
 	{/if}
+
+	{@render children?.()}
 
 	<Button variant="outline" class="h-9 rounded-l-none shadow-none" onclick={onSearch} {disabled}>
 		Go

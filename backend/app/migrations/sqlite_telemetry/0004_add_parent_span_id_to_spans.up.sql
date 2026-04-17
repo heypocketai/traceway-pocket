@@ -1,0 +1,1 @@
+ALTER TABLE spans ADD COLUMN parent_span_id TEXT DEFAULT NULL;

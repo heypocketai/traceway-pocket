@@ -13,13 +13,14 @@ import (
 )
 
 type span struct {
-	Id         uuid.UUID     `lit:"id"`
-	TraceId    uuid.UUID     `lit:"trace_id"`
-	ProjectId  uuid.UUID     `lit:"project_id"`
-	Name       string        `lit:"name"`
-	StartTime  SQLiteTime    `lit:"start_time"`
-	Duration   int64         `lit:"duration"`
-	RecordedAt SQLiteTime    `lit:"recorded_at"`
+	Id           uuid.UUID  `lit:"id"`
+	TraceId      uuid.UUID  `lit:"trace_id"`
+	ProjectId    uuid.UUID  `lit:"project_id"`
+	Name         string     `lit:"name"`
+	StartTime    SQLiteTime `lit:"start_time"`
+	Duration     int64      `lit:"duration"`
+	RecordedAt   SQLiteTime `lit:"recorded_at"`
+	ParentSpanId *uuid.UUID `lit:"parent_span_id"`
 }
 
 func init() {
@@ -30,25 +31,27 @@ func init() {
 
 func spanToRow(s models.Span) span {
 	return span{
-		Id:         s.Id,
-		TraceId:    s.TraceId,
-		ProjectId:  s.ProjectId,
-		Name:       s.Name,
-		StartTime:  NewSQLiteTime(s.StartTime),
-		Duration:   int64(s.Duration),
-		RecordedAt: NewSQLiteTime(s.RecordedAt),
+		Id:           s.Id,
+		TraceId:      s.TraceId,
+		ProjectId:    s.ProjectId,
+		Name:         s.Name,
+		StartTime:    NewSQLiteTime(s.StartTime),
+		Duration:     int64(s.Duration),
+		RecordedAt:   NewSQLiteTime(s.RecordedAt),
+		ParentSpanId: s.ParentSpanId,
 	}
 }
 
 func (r *span) toModel() models.Span {
 	return models.Span{
-		Id:         r.Id,
-		TraceId:    r.TraceId,
-		ProjectId:  r.ProjectId,
-		Name:       r.Name,
-		StartTime:  r.StartTime.Time,
-		Duration:   time.Duration(r.Duration),
-		RecordedAt: r.RecordedAt.Time,
+		Id:           r.Id,
+		TraceId:      r.TraceId,
+		ProjectId:    r.ProjectId,
+		Name:         r.Name,
+		StartTime:    r.StartTime.Time,
+		Duration:     time.Duration(r.Duration),
+		RecordedAt:   r.RecordedAt.Time,
+		ParentSpanId: r.ParentSpanId,
 	}
 }
 
@@ -71,7 +74,7 @@ func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) e
 
 func (r *spanRepository) FindByTraceId(ctx context.Context, projectId, traceId uuid.UUID) ([]models.Span, error) {
 	rows, err := lit.SelectNamed[span](db.TelemetryDB,
-		`SELECT id, trace_id, project_id, name, start_time, duration, recorded_at
+		`SELECT id, trace_id, project_id, name, start_time, duration, recorded_at, parent_span_id
 		FROM spans
 		WHERE project_id = :project_id AND trace_id = :trace_id
 		ORDER BY start_time ASC`,

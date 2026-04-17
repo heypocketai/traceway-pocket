@@ -18,7 +18,7 @@ import (
 type endpointRepository struct{}
 
 func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.Endpoint) error {
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO endpoints (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id)")
+	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO endpoints (id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id)")
 	if err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.End
 				attributesJSON = string(attributesBytes)
 			}
 		}
-		if err := batch.Append(t.Id, t.ProjectId, t.Endpoint, int64(t.Duration), t.RecordedAt, t.StatusCode, t.BodySize, t.ClientIP, attributesJSON, t.AppVersion, t.ServerName, t.DistributedTraceId); err != nil {
+		if err := batch.Append(t.Id, t.ProjectId, t.Endpoint, int64(t.Duration), t.RecordedAt, t.StatusCode, t.BodySize, t.ClientIP, attributesJSON, t.AppVersion, t.ServerName, t.DistributedTraceId, t.SpanId); err != nil {
 			return err
 		}
 	}
@@ -278,7 +278,7 @@ func (e *endpointRepository) FindByEndpoint(ctx context.Context, projectId uuid.
 
 // FindById returns a single endpoint by ID
 func (e *endpointRepository) FindById(ctx context.Context, projectId, endpointId uuid.UUID) (*models.Endpoint, error) {
-	query := `SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id
+	query := `SELECT id, project_id, endpoint, duration, recorded_at, status_code, body_size, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id
 		FROM endpoints
 		WHERE project_id = ? AND id = ?
 		LIMIT 1`
@@ -288,7 +288,7 @@ func (e *endpointRepository) FindById(ctx context.Context, projectId, endpointId
 
 	err := chdb.Conn.QueryRow(ctx, query, projectId, endpointId).Scan(
 		&t.Id, &t.ProjectId, &t.Endpoint, &t.Duration, &t.RecordedAt,
-		&t.StatusCode, &t.BodySize, &t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId)
+		&t.StatusCode, &t.BodySize, &t.ClientIP, &attributesJSON, &t.AppVersion, &t.ServerName, &t.DistributedTraceId, &t.SpanId)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

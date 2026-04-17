@@ -46,29 +46,40 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 			scopeName string
 		}
 		var allSpans []spanEntry
-		parentMap := map[string]string{} // childSpanId → parentSpanId
+		parentMap := map[string]string{}        // childSpanId → parentSpanId
+		spanById := map[string]*tracepb.Span{}  // spanId → span (for trace_id lookup)
 		for _, ss := range rs.ScopeSpans {
 			for _, span := range ss.Spans {
 				allSpans = append(allSpans, spanEntry{span: span, scopeName: ss.GetScope().GetName()})
+				spanById[string(span.SpanId)] = span
 				if len(span.ParentSpanId) > 0 {
 					parentMap[string(span.SpanId)] = string(span.ParentSpanId)
 				}
 			}
 		}
 
-		// Build spanToTraceId by walking up to the root for each span
+		// Build spanToTraceId. Prefer each span's native OTel trace_id so logs on
+		// the wire (which carry trace_id as hex) can be joined against the
+		// converted traces via traceIdUuidToHex(endpoint.id). Fall back to walking
+		// parents + minting a UUID only when the OTel trace_id is missing or
+		// malformed — an unusual case but worth handling defensively.
 		spanToTraceId := map[string]uuid.UUID{}
 		var resolveTraceId func(spanIdStr string) uuid.UUID
 		resolveTraceId = func(spanIdStr string) uuid.UUID {
 			if tid, ok := spanToTraceId[spanIdStr]; ok {
 				return tid
 			}
+			if sp, ok := spanById[spanIdStr]; ok && len(sp.TraceId) > 0 {
+				if tid := otelTraceIDToUUID(sp.TraceId); tid != uuid.Nil {
+					spanToTraceId[spanIdStr] = tid
+					return tid
+				}
+			}
 			if parentId, hasParent := parentMap[spanIdStr]; hasParent {
 				tid := resolveTraceId(parentId)
 				spanToTraceId[spanIdStr] = tid
 				return tid
 			}
-			// This is a root span
 			tid := uuid.New()
 			spanToTraceId[spanIdStr] = tid
 			return tid
@@ -99,12 +110,14 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 			}
 
 			if isRoot {
+				rootSpanId := spanId
 				if (span.Kind == tracepb.Span_SPAN_KIND_SERVER || span.Kind == tracepb.Span_SPAN_KIND_INTERNAL) && hasHTTPAttributes(spanAttrs) {
 					ep := buildEndpoint(
 						traceId, projectId, span, spanAttrs, allAttrs,
 						startTime, duration, serverName, appVersion,
 					)
 					ep.DistributedTraceId = distributedTraceId
+					ep.SpanId = &rootSpanId
 					endpoints = append(endpoints, ep)
 				} else if span.Kind == tracepb.Span_SPAN_KIND_CONSUMER {
 					t := buildTask(
@@ -112,6 +125,7 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 						startTime, endTime, duration, serverName, appVersion,
 					)
 					t.DistributedTraceId = distributedTraceId
+					t.SpanId = &rootSpanId
 					tasks = append(tasks, t)
 				} else if hasGenAiAttributes(spanAttrs) {
 					aiTrace := buildAiTrace(
@@ -134,13 +148,14 @@ func convertTraces(projectId uuid.UUID, req *coltracepb.ExportTraceServiceReques
 				}
 
 				spans = append(spans, models.Span{
-					Id:         spanId,
-					TraceId:    traceId,
-					ProjectId:  projectId,
-					Name:       spanName,
-					StartTime:  startTime,
-					Duration:   duration,
-					RecordedAt: startTime,
+					Id:           spanId,
+					TraceId:      traceId,
+					ProjectId:    projectId,
+					Name:         spanName,
+					StartTime:    startTime,
+					Duration:     duration,
+					RecordedAt:   startTime,
+					ParentSpanId: ptrSpanUUID(span.ParentSpanId),
 				})
 			}
 

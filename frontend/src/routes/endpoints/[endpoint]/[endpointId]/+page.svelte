@@ -20,6 +20,8 @@
 	import { createSmartBackHandler } from '$lib/utils/back-navigation';
 	import { resolve } from '$app/paths';
 	import DistributedTraceCard from '$lib/components/distributed-trace/distributed-trace-card.svelte';
+	import TraceLogsPanel from '$lib/components/trace-logs/trace-logs-panel.svelte';
+	import { traceIdUuidToHex } from '$lib/utils/span-id';
 
 	let { data } = $props();
 
@@ -245,16 +247,14 @@
 
 		<!-- Spans Section -->
 		<Card.Root>
-			<Card.Header>
-				<Card.Title>Spans</Card.Title>
-				<Card.Description>
-					{#if response.hasSpans}
+			{#if response.hasSpans}
+				<Card.Header>
+					<Card.Title>Spans</Card.Title>
+					<Card.Description>
 						Timing breakdown of operations within this endpoint request
-					{:else}
-						No spans recorded for this endpoint request
-					{/if}
-				</Card.Description>
-			</Card.Header>
+					</Card.Description>
+				</Card.Header>
+			{/if}
 			<Card.Content>
 				{#if response.hasSpans}
 					<SpanWaterfall
@@ -267,6 +267,18 @@
 				{/if}
 			</Card.Content>
 		</Card.Root>
+
+		<TraceLogsPanel
+			projectId={projectsState.currentProjectId ?? ''}
+			traceId={traceIdUuidToHex(response.endpoint.id)}
+			distributedTraceId={response.endpoint.distributedTraceId ?? null}
+			spans={response.spans}
+			rootSpan={{
+				id: response.endpoint.spanId ?? response.endpoint.id,
+				name: response.endpoint.endpoint
+			}}
+			traceRecordedAt={response.endpoint.recordedAt}
+		/>
 
 		{#if response.endpoint.distributedTraceId}
 			<DistributedTraceCard distributedTraceId={response.endpoint.distributedTraceId} />

@@ -21,6 +21,7 @@ export type TraceDetail = {
 	appVersion: string;
 	serverName: string;
 	distributedTraceId?: string;
+	spanId?: string;
 };
 
 export type ExceptionInfo = {

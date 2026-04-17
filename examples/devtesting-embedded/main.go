@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"errors"
 	"fmt"
@@ -10,8 +11,20 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	otellog "go.opentelemetry.io/otel/log"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
+
 	tracewaybackend "github.com/tracewayapp/traceway/backend"
-	traceway "go.tracewayapp.com"
 )
 
 //go:embed index.html
@@ -28,7 +41,92 @@ const (
 	backendToken    = "backend-dev-token"
 	frontendToken   = "frontend-dev-token"
 	monitoringToken = "monitoring-dev-token"
+
+	backendServiceName = "backend-service"
+	workerServiceName  = "worker-service"
+
+	otlpHost = "localhost:8082"
 )
+
+// otelService bundles a TracerProvider + LoggerProvider for a single logical service
+// so we can run two services in-process to exercise the distributed-logs flow.
+type otelService struct {
+	name string
+	tp   *sdktrace.TracerProvider
+	lp   *sdklog.LoggerProvider
+	tr   trace.Tracer
+	lg   otellog.Logger
+}
+
+func (s *otelService) shutdown(ctx context.Context) {
+	_ = s.tp.Shutdown(ctx)
+	_ = s.lp.Shutdown(ctx)
+}
+
+func initOtelService(ctx context.Context, serviceName, token string) (*otelService, error) {
+	headers := map[string]string{"Authorization": "Bearer " + token}
+
+	traceExporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpoint(otlpHost),
+		otlptracehttp.WithInsecure(),
+		otlptracehttp.WithURLPath("/api/otel/v1/traces"),
+		otlptracehttp.WithHeaders(headers),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s trace exporter: %w", serviceName, err)
+	}
+
+	logExporter, err := otlploghttp.New(ctx,
+		otlploghttp.WithEndpoint(otlpHost),
+		otlploghttp.WithInsecure(),
+		otlploghttp.WithURLPath("/api/otel/v1/logs"),
+		otlploghttp.WithHeaders(headers),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s log exporter: %w", serviceName, err)
+	}
+
+	res, err := resource.New(ctx,
+		resource.WithAttributes(semconv.ServiceName(serviceName)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s resource: %w", serviceName, err)
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(traceExporter, sdktrace.WithBatchTimeout(2*time.Second)),
+		sdktrace.WithResource(res),
+	)
+
+	lp := sdklog.NewLoggerProvider(
+		sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter, sdklog.WithExportInterval(2*time.Second))),
+		sdklog.WithResource(res),
+	)
+
+	return &otelService{
+		name: serviceName,
+		tp:   tp,
+		lp:   lp,
+		tr:   tp.Tracer(serviceName),
+		lg:   lp.Logger(serviceName),
+	}, nil
+}
+
+// log emits an OTel log record. The SDK auto-attaches trace_id / span_id from ctx
+// so logs emitted inside a span get chip-linked on the trace detail page.
+func (s *otelService) log(ctx context.Context, sev otellog.Severity, sevText, body string, attrs ...otellog.KeyValue) {
+	rec := otellog.Record{}
+	now := time.Now()
+	rec.SetTimestamp(now)
+	rec.SetObservedTimestamp(now)
+	rec.SetSeverity(sev)
+	rec.SetSeverityText(sevText)
+	rec.SetBody(otellog.StringValue(body))
+	if len(attrs) > 0 {
+		rec.AddAttributes(attrs...)
+	}
+	s.lg.Emit(ctx, rec)
+}
 
 func main() {
 	go tracewaybackend.Run(
@@ -40,6 +138,27 @@ func main() {
 		tracewaybackend.WithDefaultProject("Traceway Monitoring", "go", monitoringToken),
 		tracewaybackend.WithMonitoringURL(monitoringToken+"@http://localhost:8082/api/report"),
 	)
+
+	// Give the backend a moment to start listening and register project tokens
+	// before we start sending OTel data at it.
+	time.Sleep(2 * time.Second)
+
+	ctx := context.Background()
+
+	backendSvc, err := initOtelService(ctx, backendServiceName, backendToken)
+	if err != nil {
+		panic(err)
+	}
+	defer backendSvc.shutdown(ctx)
+
+	// Second OTel provider with a different service.name. Reports to the same
+	// Backend API project so both sides of the "distributed trace" are visible
+	// in one project. Used by /api/test-distributed-logs.
+	workerSvc, err := initOtelService(ctx, workerServiceName, backendToken)
+	if err != nil {
+		panic(err)
+	}
+	defer workerSvc.shutdown(ctx)
 
 	router := gin.Default()
 
@@ -58,10 +177,9 @@ func main() {
 		c.Next()
 	})
 
-	// router.Use(tracewaygin.New(
-	// 	backendToken+"@http://localhost:8082/api/report",
-	// 	tracewaygin.WithOnErrorRecording(tracewaygin.RecordingQuery|tracewaygin.RecordingBody|tracewaygin.RecordingHeader|tracewaygin.RecordingUrl),
-	// ))
+	// otelgin creates a SERVER span per request and puts it in c.Request.Context(),
+	// which is what the OTel logger reads to attach trace_id + span_id to each log.
+	router.Use(otelgin.Middleware(backendServiceName, otelgin.WithTracerProvider(backendSvc.tp)))
 
 	router.GET("/", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
@@ -74,24 +192,122 @@ func main() {
 	staticSub, _ := fs.Sub(staticFS, "static")
 	router.StaticFS("/static", http.FS(staticSub))
 
+	// Emits an error log + records an exception on the root span.
 	router.GET("/api/test-error", func(c *gin.Context) {
+		ctx := c.Request.Context()
+		backendSvc.log(ctx, otellog.SeverityInfo, "INFO", "received test-error request")
 		time.Sleep(time.Duration(20+rand.IntN(80)) * time.Millisecond)
 		err := errors.New("simulated backend error for distributed trace testing")
-		traceway.CaptureExceptionWithContext(c.Request.Context(), err)
+		backendSvc.log(ctx, otellog.SeverityError, "ERROR", "handler failed: "+err.Error())
+		span := trace.SpanFromContext(ctx)
+		span.RecordError(err, trace.WithStackTrace(true))
+		span.SetStatus(codes.Error, err.Error())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	})
 
+	// Emits a DEBUG + INFO log on a successful request.
 	router.GET("/api/test-success", func(c *gin.Context) {
+		ctx := c.Request.Context()
+		backendSvc.log(ctx, otellog.SeverityDebug, "DEBUG", "test-success entered")
 		time.Sleep(time.Duration(20+rand.IntN(80)) * time.Millisecond)
+		backendSvc.log(ctx, otellog.SeverityInfo, "INFO", "test-success completed")
 		c.JSON(http.StatusOK, gin.H{"message": "success"})
+	})
+
+	// Emits one log at each severity level — useful for inspecting the /logs page
+	// and confirming the SeverityBadge renders every variant.
+	router.GET("/api/test-log-levels", func(c *gin.Context) {
+		ctx := c.Request.Context()
+		backendSvc.log(ctx, otellog.SeverityTrace1, "TRACE", "trace-level log for visual testing")
+		backendSvc.log(ctx, otellog.SeverityDebug, "DEBUG", "debug: cache miss, falling back to db")
+		backendSvc.log(ctx, otellog.SeverityInfo, "INFO", "info: request accepted")
+		backendSvc.log(ctx, otellog.SeverityWarn, "WARN", "warn: connection pool at 80% capacity")
+		backendSvc.log(ctx, otellog.SeverityError, "ERROR", "error: downstream returned non-2xx")
+		backendSvc.log(ctx, otellog.SeverityFatal, "FATAL", "fatal: synthetic fatal for UI testing, nothing is actually broken")
+		c.JSON(http.StatusOK, gin.H{"emitted": 6})
+	})
+
+	// Nested child spans + logs from each level. On the endpoint detail page:
+	//   - root-span logs chip as the endpoint name
+	//   - child-span logs chip as that child span's name (db.query / cache.lookup / auth.verify)
+	// Also populates parent_span_id on each non-root span.
+	router.GET("/api/test-spans-with-logs", func(c *gin.Context) {
+		ctx := c.Request.Context()
+		backendSvc.log(ctx, otellog.SeverityInfo, "INFO", "handler: entering /test-spans-with-logs")
+
+		authCtx, authSpan := backendSvc.tr.Start(ctx, "auth.verify")
+		backendSvc.log(authCtx, otellog.SeverityInfo, "INFO", "auth: token verified")
+		time.Sleep(5 * time.Millisecond)
+		authSpan.End()
+
+		dbCtx, dbSpan := backendSvc.tr.Start(ctx, "db.query")
+		backendSvc.log(dbCtx, otellog.SeverityDebug, "DEBUG", "db: executing SELECT * FROM users WHERE id = ?")
+		time.Sleep(20 * time.Millisecond)
+
+		cacheCtx, cacheSpan := backendSvc.tr.Start(dbCtx, "cache.lookup")
+		backendSvc.log(cacheCtx, otellog.SeverityInfo, "INFO", "cache: key user:42 -> hit")
+		time.Sleep(2 * time.Millisecond)
+		cacheSpan.End()
+
+		backendSvc.log(dbCtx, otellog.SeverityWarn, "WARN", "db: query took longer than expected",
+			otellog.String("threshold_ms", "20"))
+		dbSpan.End()
+
+		backendSvc.log(ctx, otellog.SeverityInfo, "INFO", "handler: returning 200")
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
+	// Distributed logs: emits logs from two different services (backend-service
+	// and worker-service) with a shared traceway.distributed_trace_id so the
+	// "Load logs from other traces" button on the trace detail page has
+	// something to pull in.
+	router.GET("/api/test-distributed-logs", func(c *gin.Context) {
+		ctx := c.Request.Context()
+		dtid := uuid.New().String()
+
+		rootSpan := trace.SpanFromContext(ctx)
+		rootSpan.SetAttributes(attribute.String("traceway.distributed_trace_id", dtid))
+
+		backendSvc.log(ctx, otellog.SeverityInfo, "INFO", "backend: received request, about to call worker",
+			otellog.String("distributed_trace_id", dtid))
+
+		// Fresh root context (no parent) so the worker registers as a separate
+		// trace in Traceway. WithSpanKind(Consumer) makes the converter treat
+		// this as a task rather than another endpoint.
+		workerCtx, workerSpan := workerSvc.tr.Start(context.Background(), "worker.process-job",
+			trace.WithSpanKind(trace.SpanKindConsumer))
+		workerSpan.SetAttributes(attribute.String("traceway.distributed_trace_id", dtid))
+
+		workerSvc.log(workerCtx, otellog.SeverityInfo, "INFO", "worker: starting job",
+			otellog.String("distributed_trace_id", dtid))
+		time.Sleep(15 * time.Millisecond)
+		workerSvc.log(workerCtx, otellog.SeverityDebug, "DEBUG", "worker: step 1 complete")
+		time.Sleep(15 * time.Millisecond)
+		workerSvc.log(workerCtx, otellog.SeverityWarn, "WARN", "worker: retryable downstream error, will retry once")
+		time.Sleep(10 * time.Millisecond)
+		workerSvc.log(workerCtx, otellog.SeverityInfo, "INFO", "worker: job complete")
+		workerSpan.End()
+
+		backendSvc.log(ctx, otellog.SeverityInfo, "INFO", "backend: worker reported success, returning 200")
+		c.JSON(http.StatusOK, gin.H{
+			"status":             "ok",
+			"distributedTraceId": dtid,
+		})
 	})
 
 	fmt.Println()
 	fmt.Println("=================================================")
-	fmt.Printf("  Node build:  http://localhost:%d\n", appPort)
-	fmt.Printf("  CDN (no build): http://localhost:%d/cdn\n", appPort)
-	fmt.Println("  Dashboard:   http://localhost:8082")
-	fmt.Println("  Login:       admin@localhost.com / admin")
+	fmt.Printf("  Node build:       http://localhost:%d\n", appPort)
+	fmt.Printf("  CDN (no build):   http://localhost:%d/cdn\n", appPort)
+	fmt.Println("  Dashboard:        http://localhost:8082")
+	fmt.Println("  Login:            admin@localhost.com / admin")
+	fmt.Println()
+	fmt.Println("  OTel logs test endpoints (hit with curl or browser):")
+	fmt.Printf("    curl http://localhost:%d/api/test-error\n", appPort)
+	fmt.Printf("    curl http://localhost:%d/api/test-success\n", appPort)
+	fmt.Printf("    curl http://localhost:%d/api/test-log-levels\n", appPort)
+	fmt.Printf("    curl http://localhost:%d/api/test-spans-with-logs\n", appPort)
+	fmt.Printf("    curl http://localhost:%d/api/test-distributed-logs\n", appPort)
 	fmt.Println("=================================================")
 	fmt.Println()
 
