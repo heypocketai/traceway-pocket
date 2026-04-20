@@ -1,0 +1,194 @@
+# Logs
+
+Traceway ingests OpenTelemetry logs via the OTLP/HTTP protocol at `POST /api/otel/v1/logs`. Logs emitted inside an active span context are automatically linked to the trace and span that produced them.
+
+## Log Record Mapping
+
+Each OTLP `LogRecord` maps to a Traceway log as follows:
+
+| OTel Field                      | Traceway Field        | Notes                                                                 |
+| ------------------------------- | --------------------- | --------------------------------------------------------------------- |
+| `TimeUnixNano`                  | Timestamp             | Falls back to `ObservedTimeUnixNano` if zero                          |
+| `TraceId` (16 bytes)            | Trace ID              | Hex-encoded                                                           |
+| `SpanId` (8 bytes)              | Span ID               | Hex-encoded                                                           |
+| `SeverityNumber` (1-24)         | Severity Number       | Also used to compute Severity Text when text is empty                  |
+| `SeverityText`                  | Severity Text         | Uppercased; when empty, derived from `SeverityNumber` (see below)     |
+| `Body`                          | Body                  | Strings stored as-is; arrays and maps are JSON-encoded                |
+| `Resource.service.name`         | Service               | Required for the Logs page service filter                             |
+| Resource attributes             | Resource Attributes   | Stringified; array and map values are dropped at attribute level      |
+| Scope name / version            | Scope Name / Version  |                                                                       |
+| Scope attributes                | Scope Attributes      | Same stringification rules as resource attributes                     |
+| Log record attributes           | Log Attributes        | Same stringification rules                                            |
+
+## Severity Fallback
+
+When an SDK sends a `SeverityNumber` but leaves `SeverityText` blank, Traceway computes the level:
+
+| Severity Number | Severity Text |
+| --------------- | ------------- |
+| 1-4             | TRACE         |
+| 5-8             | DEBUG         |
+| 9-12            | INFO          |
+| 13-16           | WARN          |
+| 17-20           | ERROR         |
+| 21+             | FATAL         |
+
+A severity number of `0` is treated as unset.
+
+## Linking Logs to Traces
+
+OTel Logs SDKs read the active span from the context you pass into `Emit` / `logger.log` / equivalent. When a log is emitted inside a request handler, background job, or child span, its `trace_id` and `span_id` are populated automatically — no plumbing on your side.
+
+In the Traceway dashboard, the trace detail page shows a **Logs** tab listing every log for that trace, plus an **All Distributed Traces** tab that pulls in logs from linked traces across services.
+
+## Example: Node.js
+
+```typescript
+import { NodeSDK } from "@opentelemetry/sdk-node";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import { Resource } from "@opentelemetry/resources";
+import { logs, SeverityNumber } from "@opentelemetry/api-logs";
+
+const sdk = new NodeSDK({
+  resource: new Resource({
+    "service.name": "my-service",
+    "service.version": "1.0.0",
+  }),
+  logRecordProcessors: [
+    new BatchLogRecordProcessor(
+      new OTLPLogExporter({
+        url: "https://your-traceway-instance.com/api/otel/v1/logs",
+        headers: {
+          Authorization: "Bearer your-project-token",
+        },
+      }),
+    ),
+  ],
+});
+
+sdk.start();
+
+const logger = logs.getLogger("app");
+
+logger.emit({
+  severityNumber: SeverityNumber.INFO,
+  severityText: "INFO",
+  body: "order received",
+  attributes: { "order.id": "ord_123" },
+});
+```
+
+When called inside an OTel-instrumented HTTP handler (or any code that runs under an active span), the emitted log automatically carries the active `trace_id` and `span_id`.
+
+## Example: Python
+
+```python
+import logging
+from opentelemetry import trace
+from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry._logs import set_logger_provider
+
+resource = Resource.create({
+    "service.name": "my-python-service",
+    "service.version": "1.0.0",
+})
+
+provider = LoggerProvider(resource=resource)
+set_logger_provider(provider)
+
+exporter = OTLPLogExporter(
+    endpoint="https://your-traceway-instance.com/api/otel/v1/logs",
+    headers={"Authorization": "Bearer your-project-token"},
+)
+provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+
+handler = LoggingHandler(level=logging.NOTSET, logger_provider=provider)
+logging.getLogger().addHandler(handler)
+logging.getLogger().setLevel(logging.INFO)
+
+logging.info("order received", extra={"order.id": "ord_123"})
+```
+
+The standard `LoggingHandler` bridges Python's `logging` module to OTel. Logs emitted inside a traced request automatically pick up the current trace and span IDs.
+
+## Example: Go
+
+```go
+import (
+    "context"
+    "time"
+
+    "go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
+    otellog "go.opentelemetry.io/otel/log"
+    sdklog "go.opentelemetry.io/otel/sdk/log"
+    "go.opentelemetry.io/otel/sdk/resource"
+    semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+)
+
+func initLogs(ctx context.Context) (*sdklog.LoggerProvider, error) {
+    exporter, err := otlploghttp.New(ctx,
+        otlploghttp.WithEndpoint("your-traceway-instance.com"),
+        otlploghttp.WithURLPath("/api/otel/v1/logs"),
+        otlploghttp.WithHeaders(map[string]string{
+            "Authorization": "Bearer your-project-token",
+        }),
+    )
+    if err != nil {
+        return nil, err
+    }
+
+    res, _ := resource.New(ctx, resource.WithAttributes(
+        semconv.ServiceName("my-service"),
+    ))
+
+    lp := sdklog.NewLoggerProvider(
+        sdklog.WithProcessor(sdklog.NewBatchProcessor(exporter,
+            sdklog.WithExportInterval(2*time.Second))),
+        sdklog.WithResource(res),
+    )
+    return lp, nil
+}
+
+// Emit a log inside an active span context.
+func logInfo(ctx context.Context, logger otellog.Logger, msg string) {
+    rec := otellog.Record{}
+    rec.SetTimestamp(time.Now())
+    rec.SetSeverity(otellog.SeverityInfo)
+    rec.SetSeverityText("INFO")
+    rec.SetBody(otellog.StringValue(msg))
+    logger.Emit(ctx, rec)
+}
+```
+
+When `ctx` carries an active span (for example, the request context inside a Gin or net/http handler instrumented with OTel), the log automatically carries that span's trace and span IDs.
+
+## Quick Start: OTel Collector
+
+If you route telemetry through a Collector, add a `logs` pipeline that targets the same OTLP/HTTP endpoint:
+
+```yaml
+exporters:
+  otlphttp:
+    endpoint: "https://your-traceway-instance.com/api/otel"
+    headers:
+      Authorization: "Bearer your-project-token"
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlphttp]
+    metrics:
+      exporters: [otlphttp]
+    logs:
+      exporters: [otlphttp]
+```
+
+## Next Steps
+
+- [Traces](/client/otel/traces) — how OTel spans map to Traceway concepts
+- [Metrics](/client/otel/metrics) — supported metric types and histogram handling
+- [Overview](/client/otel) — protocol details and authentication

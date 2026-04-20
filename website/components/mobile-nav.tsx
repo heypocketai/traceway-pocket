@@ -80,6 +80,13 @@ export function MobileNav() {
                         >
                             AI Tracing
                         </Link>
+                        <Link
+                            href="/product/logs"
+                            className="text-lg font-medium text-zinc-600 hover:text-zinc-900 transition-colors pl-2"
+                            onClick={() => setIsOpen(false)}
+                        >
+                            Logs
+                        </Link>
                         <div className="border-t border-zinc-100"></div>
                         <Link
                             href="/cloud"

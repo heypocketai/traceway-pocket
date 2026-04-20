@@ -3,5 +3,6 @@
   "exceptions": "Exceptions",
   "spans": "Spans",
   "tasks": "Tasks",
-  "metrics": "Metrics"
+  "metrics": "Metrics",
+  "logs": "Logs"
 }

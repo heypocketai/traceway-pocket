@@ -1,6 +1,6 @@
 # OpenTelemetry Integration
 
-Send traces and metrics from any OpenTelemetry-instrumented application to Traceway — no vendor SDK required.
+Send traces, metrics, and logs from any OpenTelemetry-instrumented application to Traceway — no vendor SDK required.
 
 [OpenTelemetry](https://opentelemetry.io/) (OTel) is the industry-standard, vendor-neutral framework for collecting telemetry. If your app already uses OTel, you can point it at Traceway with a few lines of config. If you're starting fresh, any OTel SDK will work.
 
@@ -8,7 +8,7 @@ Send traces and metrics from any OpenTelemetry-instrumented application to Trace
 
 1. **Instrument your app** with an OpenTelemetry SDK (or auto-instrumentation).
 2. **Export via OTLP/HTTP** — configure the SDK (or an OTel Collector) to send data to your Traceway instance.
-3. **Traceway maps the data** — spans become endpoints and traces; metrics appear on your dashboards.
+3. **Traceway maps the data** — spans become endpoints and traces, metrics appear on your dashboards, and logs are indexed and linked to their originating traces.
 
 ## Supported Languages
 
@@ -31,6 +31,7 @@ Any language with an OTel SDK can export to Traceway. Here are the most common o
 | **Endpoint** | `https://<your-instance>/api/otel` |
 | **Traces path** | `/v1/traces` |
 | **Metrics path** | `/v1/metrics` |
+| **Logs path** | `/v1/logs` |
 | **Auth header** | `Authorization: Bearer <project_token>` |
 | **Protocol** | OTLP/HTTP (Protobuf or JSON) |
 | **Compression** | Gzip supported (`Content-Encoding: gzip`) |
@@ -80,6 +81,8 @@ service:
       exporters: [otlphttp]
     metrics:
       exporters: [otlphttp]
+    logs:
+      exporters: [otlphttp]
 ```
 
 ## Connection Page
@@ -92,3 +95,4 @@ Your Traceway dashboard includes a **Connection** page with a ready-made config 
 
 - [Traces](/client/otel/traces) — how OTel spans map to Traceway concepts
 - [Metrics](/client/otel/metrics) — supported metric types and histogram handling
+- [Logs](/client/otel/logs) — export OTel logs and link them to your traces

@@ -38,6 +38,7 @@ OTEL_PHP_AUTOLOAD_ENABLED=true
 OTEL_SERVICE_NAME=my-symfony-app
 OTEL_TRACES_EXPORTER=otlp
 OTEL_METRICS_EXPORTER=otlp
+OTEL_LOGS_EXPORTER=otlp
 OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 OTEL_EXPORTER_OTLP_ENDPOINT=https://your-traceway-instance.com/api/otel
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer your-project-token"
@@ -124,4 +125,5 @@ Visit `/testing` in your browser, then check the Traceway dashboard — the exce
 - [Spans](/client/symfony/spans) — create custom spans to measure sub-operations
 - [Tasks](/client/symfony/tasks) — trace Symfony Messenger background jobs
 - [Metrics](/client/symfony/metrics) — track custom counters, histograms, and gauges
-- [OpenTelemetry docs](/client/otel) — how OTel traces and metrics map to Traceway
+- [Logs](/client/symfony/logs) — forward Monolog / PSR-3 logs to Traceway
+- [OpenTelemetry docs](/client/otel) — how OTel traces, metrics, and logs map to Traceway
