@@ -104,6 +104,13 @@ export function MobileNav({
             style={{ borderTop: "1px solid var(--hair)" }}
           >
             <Link
+              href="https://cloud.tracewayapp.com/register"
+              onClick={() => setOpen(false)}
+              className="btn btn-accent w-full justify-center"
+            >
+              Start for free
+            </Link>
+            <Link
               href="https://cloud.tracewayapp.com/login"
               onClick={() => setOpen(false)}
               className="btn btn-ghost w-full justify-center"

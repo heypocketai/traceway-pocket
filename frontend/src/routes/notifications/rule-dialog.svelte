@@ -8,7 +8,7 @@
 	import * as Alert from '$lib/components/ui/alert';
 	import { toast } from 'svelte-sonner';
 	import { api } from '$lib/api';
-	import { projectsState } from '$lib/state/projects.svelte';
+	import { projectsState, isFrontendFramework } from '$lib/state/projects.svelte';
 
 	interface NotificationChannel {
 		id: number;
@@ -103,6 +103,29 @@
 		{ value: 'throughput_drop', label: 'Throughput Drop' },
 		{ value: 'ai_trace_cost', label: 'AI Trace Cost' }
 	];
+
+	const isFrontendProject = $derived(
+		!!projectsState.currentProject &&
+			isFrontendFramework(projectsState.currentProject.framework)
+	);
+
+	const visibleRuleTypes = $derived(
+		isFrontendProject
+			? [{ value: 'new_error', label: 'New Issue' }]
+			: [
+					{ value: 'new_error', label: 'New Issue' },
+					{ value: 'impact_score_critical', label: 'Impact Score Critical' },
+					{ value: 'impact_score_high', label: 'Impact Score High' },
+					{ value: 'impact_score_medium', label: 'Impact Score Medium' },
+					{ value: 'ai_trace_cost', label: 'AI Trace Cost' }
+				]
+	);
+
+	$effect(() => {
+		if (open && !visibleRuleTypes.some((o) => o.value === ruleType)) {
+			ruleType = 'new_error';
+		}
+	});
 
 	const ruleTypeDescriptions: Record<string, string> = {
 		new_error:
@@ -399,24 +422,9 @@
 						{ruleTypeOptions.find((o) => o.value === ruleType)?.label || 'Select type'}
 					</Select.Trigger>
 					<Select.Content>
-						<Select.Item value="new_error">New Issue</Select.Item>
-						<Select.Item value="impact_score_critical">Impact Score Critical</Select.Item>
-						<Select.Item value="impact_score_high">Impact Score High</Select.Item>
-						<Select.Item value="impact_score_medium">Impact Score Medium</Select.Item>
-						<Select.Item value="ai_trace_cost">AI Trace Cost</Select.Item>
-						<!-- <Select.Separator />
-						<Select.Item value="error_regression">Error Regression</Select.Item>
-						<Select.Item value="error_rate_threshold">Error Rate</Select.Item>
-						<Select.Item value="error_count_threshold">Error Count</Select.Item>
-						<Select.Item value="endpoint_p95_threshold">Endpoint P95</Select.Item>
-						<Select.Item value="endpoint_p99_threshold">Endpoint P99</Select.Item>
-						<Select.Item value="endpoint_error_rate">Endpoint Error Rate</Select.Item>
-						<Select.Item value="apdex_drop">Apdex Drop</Select.Item>
-						<Select.Item value="metric_threshold">Metric Threshold</Select.Item>
-						<Select.Item value="no_data">No Data</Select.Item>
-						<Select.Item value="task_duration_threshold">Task Duration</Select.Item>
-						<Select.Item value="task_failure_rate">Task Failure Rate</Select.Item>
-						<Select.Item value="throughput_drop">Throughput Drop</Select.Item> -->
+						{#each visibleRuleTypes as option}
+							<Select.Item value={option.value}>{option.label}</Select.Item>
+						{/each}
 					</Select.Content>
 				</Select.Root>
 			</div>

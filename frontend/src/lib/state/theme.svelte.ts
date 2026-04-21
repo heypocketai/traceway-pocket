@@ -1,24 +1,20 @@
 export const themeState = $state({
-    isDark: false
+    isDark: true
 });
 
 export function initTheme() {
     if (typeof document !== 'undefined') {
-        // Check localStorage first
         const stored = localStorage.getItem('theme');
 
         if (stored === 'dark' || stored === 'light') {
-            // Use stored preference
             themeState.isDark = stored === 'dark';
         } else {
-            // Default to light mode
-            themeState.isDark = false;
+            themeState.isDark = true;
         }
 
-        // Apply the theme
         document.documentElement.classList.toggle('dark', themeState.isDark);
+        document.documentElement.style.colorScheme = themeState.isDark ? 'dark' : 'light';
 
-        // Watch for external class changes
         const observer = new MutationObserver(() => {
             themeState.isDark = document.documentElement.classList.contains('dark');
         });
@@ -36,5 +32,6 @@ export function initTheme() {
 export function toggleTheme() {
     themeState.isDark = !themeState.isDark;
     document.documentElement.classList.toggle('dark', themeState.isDark);
+    document.documentElement.style.colorScheme = themeState.isDark ? 'dark' : 'light';
     localStorage.setItem('theme', themeState.isDark ? 'dark' : 'light');
 }

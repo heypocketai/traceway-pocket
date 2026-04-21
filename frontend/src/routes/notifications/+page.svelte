@@ -455,7 +455,9 @@
 		window.addEventListener('popstate', handlePopState);
 		loadChannels();
 		loadRules();
-		loadHistory(false);
+		if (activeTab === 'history') {
+			loadHistory(false);
+		}
 	});
 
 	onDestroy(() => {

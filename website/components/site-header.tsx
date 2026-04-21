@@ -259,6 +259,12 @@ export function SiteHeader() {
           >
             Sign in
           </Link>
+          <Link
+            href="https://cloud.tracewayapp.com/register"
+            className="btn btn-accent btn-sm"
+          >
+            Start for free
+          </Link>
         </div>
 
         <MobileNav pillars={PILLARS} specialized={SPECIALIZED} />

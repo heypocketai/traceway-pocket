@@ -315,14 +315,11 @@
     font-weight: 500;
     font-size: 14px;
     letter-spacing: -0.01em;
-    transition: transform 0.12s ease, background 0.2s, border-color 0.2s, color 0.2s, filter 0.2s, box-shadow 0.2s;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     border: 1px solid transparent;
     white-space: nowrap;
     cursor: pointer;
     user-select: none;
-  }
-  .btn:active {
-    transform: scale(0.97);
   }
   .btn-primary {
     background: var(--fg-0);
@@ -339,7 +336,7 @@
       0 0 0 1px color-mix(in oklab, var(--a1) 40%, transparent);
   }
   .btn-accent:hover {
-    filter: brightness(1.06);
+    background: linear-gradient(180deg, color-mix(in oklab, var(--a1) 100%, white 18%), var(--a1));
   }
   .btn-ghost {
     border-color: var(--hair-2);
@@ -563,7 +560,6 @@
     padding: 100px 0 40px;
   }
   .two-track-head {
-    max-width: 760px;
     margin-bottom: 48px;
   }
   .two-track-head h2 {

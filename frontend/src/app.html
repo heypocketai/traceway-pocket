@@ -1,8 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark" style="color-scheme: dark; background: #05070c;">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script>
+			// Default to dark; honor stored preference if the user has set one.
+			try {
+				var stored = localStorage.getItem('theme');
+				if (stored === 'light') {
+					document.documentElement.classList.remove('dark');
+					document.documentElement.style.colorScheme = 'light';
+					document.documentElement.style.background = '';
+				}
+			} catch (e) {}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
