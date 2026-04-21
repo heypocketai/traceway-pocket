@@ -104,7 +104,7 @@
 							class="flex flex-row items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-accent hover:text-accent-foreground"
 						>
 							{#if projectsState.currentProject}
-								<FrameworkIcon framework={projectsState.currentProject.framework} />
+								<FrameworkIcon framework={projectsState.currentProject.framework} class="size-6 shrink-0" />
 							{/if}
 							<span>{projectsState.currentProject?.name || 'Select Project'}</span>
 							<ChevronDown size={16} />

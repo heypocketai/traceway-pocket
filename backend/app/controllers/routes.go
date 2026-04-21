@@ -61,6 +61,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	// Widget groups
 	router.GET("/widget-groups", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, WidgetGroupController.List)
 	router.POST("/widget-groups", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Create)
+	router.POST("/widget-groups/populate-defaults", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.PopulateDefaults)
 	router.GET("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, WidgetGroupController.GetWithWidgets)
 	router.PUT("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Update)
 	router.DELETE("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Delete)

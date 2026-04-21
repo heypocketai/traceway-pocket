@@ -9,7 +9,7 @@
 	import WidgetGrid from '$lib/components/dashboard/widget-grid.svelte';
 	import WidgetConfigPanel from '$lib/components/dashboard/widget-config-panel.svelte';
 	import { api } from '$lib/api';
-	import { projectsState } from '$lib/state/projects.svelte';
+	import { projectsState, FRAMEWORK_LABELS, type Framework } from '$lib/state/projects.svelte';
 	import { getTimezone } from '$lib/state/timezone.svelte';
 	import { toUTCISO, calendarDateTimeToLuxon, formatDateTime } from '$lib/utils/formatters';
 	import { TimeRangePicker } from '$lib/components/ui/time-range-picker';
@@ -22,7 +22,7 @@
 		updateUrl
 	} from '$lib/utils/url-params';
 	import { CalendarDate } from '@internationalized/date';
-	import { Trash2, Plus, RefreshCw, CircleAlert, EllipsisVertical } from 'lucide-svelte';
+	import { Trash2, Plus, RefreshCw, CircleAlert, EllipsisVertical, Sparkles } from 'lucide-svelte';
 	import * as Alert from '$lib/components/ui/alert';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { toast } from 'svelte-sonner';
@@ -51,6 +51,9 @@
 	};
 
 	let widgetGroups = $state<WidgetGroup[]>([]);
+	let projectFramework = $state<Framework | ''>('');
+	let canPopulateDefaults = $state(false);
+	let populating = $state(false);
 	let loading = $state(true);
 	let activeTabId = $state<string>('');
 	let activeGroup = $state<WidgetGroupWithWidgets | null>(null);
@@ -152,6 +155,8 @@
 				projectId: projectsState.currentProjectId ?? undefined
 			});
 			widgetGroups = response.widgetGroups || [];
+			projectFramework = (response.framework as Framework) || '';
+			canPopulateDefaults = !!response.canPopulateDefaults;
 			if (widgetGroups.length > 0 && !activeTabId) {
 				activeTabId = String(widgetGroups[0].id);
 			}
@@ -161,6 +166,27 @@
 			loading = false;
 		}
 	}
+
+	async function populateDefaults() {
+		populating = true;
+		try {
+			await api.post(
+				'/widget-groups/populate-defaults',
+				{},
+				{ projectId: projectsState.currentProjectId ?? undefined }
+			);
+			toast.success('Successfully populated default charts', { position: 'top-center' });
+			await loadWidgetGroups();
+		} catch (e: any) {
+			toast.error(e?.message || 'Failed to populate default charts', { position: 'top-center' });
+		} finally {
+			populating = false;
+		}
+	}
+
+	const frameworkLabel = $derived(
+		projectFramework ? (FRAMEWORK_LABELS[projectFramework] ?? projectFramework) : ''
+	);
 
 	async function loadGroupWidgets(groupId: string) {
 		loadingGroup = true;
@@ -416,13 +442,25 @@
 		</div>
 	{:else if widgetGroups.length === 0}
 		<div
-			class="flex flex-col items-center justify-center rounded-md bg-muted py-20 text-center text-muted-foreground"
+			class="flex flex-col items-center justify-center rounded-md bg-muted py-20 text-center"
 		>
-			<p class="mb-4">No widget groups yet. Create one to get started.</p>
-			<Button onclick={() => (showCreateDialog = true)}>
-				<Plus class="mr-1 h-4 w-4" />
-				Create your first Widget Group
-			</Button>
+			<p class="mb-4 text-muted-foreground">No widget groups yet.</p>
+			<div class="flex flex-wrap items-center justify-center gap-2">
+				{#if canPopulateDefaults}
+					<Button onclick={populateDefaults} disabled={populating}>
+						<Sparkles class="mr-1 h-4 w-4" />
+						{populating
+							? 'Populating...'
+							: frameworkLabel
+								? `Populate default charts for ${frameworkLabel}`
+								: 'Populate default charts'}
+					</Button>
+				{/if}
+				<Button variant="outline" onclick={() => (showCreateDialog = true)}>
+					<Plus class="mr-1 h-4 w-4" />
+					Create your own Widget Group
+				</Button>
+			</div>
 		</div>
 	{:else}
 		<Tabs.Root value={activeTabId} onValueChange={handleTabChange}>

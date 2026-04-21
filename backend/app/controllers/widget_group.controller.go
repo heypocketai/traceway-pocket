@@ -33,30 +33,56 @@ func (c *widgetGroupController) List(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list widget groups: %w", err))
 		return
 	}
-	if len(list) == 0 {
-		project, err := repositories.ProjectRepository.FindById(tx, projectId)
-		if err != nil {
-			ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find project: %w", err))
-			return
-		}
-		goFrameworks := map[string]bool{
-			"gin": true, "fiber": true, "chi": true,
-			"fasthttp": true, "stdlib": true, "custom": true,
-		}
-		if project != nil && goFrameworks[project.Framework] {
-			if err := ensureDefaultWidgetGroups(tx, projectId); err != nil {
-				ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to create default widget groups: %w", err))
-				return
-			}
-			list, err = repositories.WidgetGroupRepository.FindByProject(tx, projectId)
-			if err != nil {
-				ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list widget groups: %w", err))
-				return
-			}
-		}
+
+	project, err := repositories.ProjectRepository.FindById(tx, projectId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find project: %w", err))
+		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"widgetGroups": list})
+	framework := ""
+	if project != nil {
+		framework = project.Framework
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"widgetGroups":        list,
+		"framework":           framework,
+		"canPopulateDefaults": len(list) == 0,
+	})
+}
+
+func (c *widgetGroupController) PopulateDefaults(ctx *gin.Context) {
+	projectId, err := middleware.GetProjectId(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
+		return
+	}
+
+	tx := middleware.GetTx(ctx)
+
+	existing, err := repositories.WidgetGroupRepository.FindByProject(tx, projectId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list widget groups: %w", err))
+		return
+	}
+	if len(existing) > 0 {
+		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Project already has widget groups."})
+		return
+	}
+
+	if err := ensureDefaultWidgetGroups(tx, projectId); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to create default widget groups: %w", err))
+		return
+	}
+
+	list, err := repositories.WidgetGroupRepository.FindByProject(tx, projectId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list widget groups: %w", err))
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, gin.H{"widgetGroups": list})
 }
 
 type CreateWidgetGroupRequest struct {
@@ -284,7 +310,11 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 		"react": true, "svelte": true, "vuejs": true,
 		"nextjs": true, "nestjs": true, "express": true, "remix": true,
 	}
+	otelFrameworks := map[string]bool{
+		"opentelemetry": true,
+	}
 	isJS := project != nil && jsFrameworks[project.Framework]
+	isOtel := project != nil && otelFrameworks[project.Framework]
 
 	type widgetDef struct {
 		title string
@@ -297,35 +327,65 @@ func ensureDefaultWidgetGroups(tx *sql.Tx, projectId uuid.UUID) error {
 
 	var groupDefs []groupDef
 
-	if !isJS {
-		groupDefs = append(groupDefs, groupDef{
-			name: "Application",
-			widgets: []widgetDef{
-				{"Go Routines", "go.go_routines"},
-				{"Heap Objects", "go.heap_objects"},
-				{"GC Cycles", "go.num_gc"},
-				{"GC Pause", "go.gc_pause"},
+	if isOtel {
+		groupDefs = append(groupDefs,
+			groupDef{
+				name: "System",
+				widgets: []widgetDef{
+					{"CPU Utilization", "system.cpu.utilization"},
+					{"Memory Utilization", "system.memory.utilization"},
+					{"Memory Usage", "system.memory.usage"},
+					{"Load Avg (1m)", "system.cpu.load_average.1m"},
+				},
 			},
-		})
-	}
+			groupDef{
+				name: "Disk / Net",
+				widgets: []widgetDef{
+					{"Disk I/O", "system.disk.io"},
+					{"Filesystem Usage", "system.filesystem.usage"},
+					{"Network I/O", "system.network.io"},
+					{"Open Connections", "system.network.connections"},
+				},
+			},
+			groupDef{
+				name: "Process",
+				widgets: []widgetDef{
+					{"Process CPU Time", "process.cpu.time"},
+					{"Process RSS", "process.memory.usage"},
+					{"Process Virtual", "process.memory.virtual"},
+				},
+			},
+		)
+	} else {
+		if !isJS {
+			groupDefs = append(groupDefs, groupDef{
+				name: "Application",
+				widgets: []widgetDef{
+					{"Go Routines", "go.go_routines"},
+					{"Heap Objects", "go.heap_objects"},
+					{"GC Cycles", "go.num_gc"},
+					{"GC Pause", "go.gc_pause"},
+				},
+			})
+		}
 
-	groupDefs = append(groupDefs,
-		groupDef{
-			name: "Stats",
-			widgets: []widgetDef{
-				{"Memory Usage", "mem.used"},
-				{"Memory Used %", "mem.used_pcnt"},
-				{"Total Memory", "mem.total"},
+		groupDefs = append(groupDefs,
+			groupDef{
+				name: "Stats",
+				widgets: []widgetDef{
+					{"Memory Usage", "mem.used"},
+					{"Total Memory", "mem.total"},
+				},
 			},
-		},
-		groupDef{
-			name: "CPU / Mem",
-			widgets: []widgetDef{
-				{"CPU Usage", "cpu.used_pcnt"},
-				{"Memory Usage", "mem.used"},
+			groupDef{
+				name: "CPU / Mem",
+				widgets: []widgetDef{
+					{"CPU Usage", "cpu.used_pcnt"},
+					{"Memory Usage", "mem.used"},
+				},
 			},
-		},
-	)
+		)
+	}
 
 	now := time.Now().UTC()
 	for _, gd := range groupDefs {

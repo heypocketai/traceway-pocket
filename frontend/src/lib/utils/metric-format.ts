@@ -1,6 +1,21 @@
 type FormatResult = { text: string; unit: string };
 
 export function formatMetricValue(value: number, unit: string): FormatResult {
+	// OTel canonical unit '1' is a dimensionless ratio (0-1) — render as percent.
+	if (unit === '1') {
+		return formatMetricValue(value * 100, '%');
+	}
+
+	// OTel canonical unit 'By' is bytes — normalize to the existing bytes branch.
+	if (unit === 'By') {
+		return formatMetricValue(value, 'B');
+	}
+
+	// OTel annotation units like '{connections}', '{packets}' — treat as raw count.
+	if (unit.length > 2 && unit.startsWith('{') && unit.endsWith('}')) {
+		return formatMetricValue(value, 'count');
+	}
+
 	if (unit === '%') {
 		if (value === 0) return { text: '0', unit: '%' };
 		if (Math.abs(value) < 0.1) return { text: value.toFixed(2), unit: '%' };
