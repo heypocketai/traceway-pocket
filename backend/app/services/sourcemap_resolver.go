@@ -1,20 +1,84 @@
 package services
 
 import (
-	"github.com/tracewayapp/traceway/backend/app/cache"
-	"github.com/tracewayapp/traceway/backend/app/models"
-	"github.com/tracewayapp/traceway/backend/app/storage"
+	"container/list"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
+
+	"github.com/tracewayapp/traceway/backend/app/cache"
+	"github.com/tracewayapp/traceway/backend/app/models"
+	"github.com/tracewayapp/traceway/backend/app/storage"
 
 	"github.com/go-sourcemap/sourcemap"
 	"github.com/google/uuid"
 	traceway "go.tracewayapp.com"
 )
+
+// parsedSourceMapCache holds already-parsed *sourcemap.Consumer values so
+// concurrent stack-trace resolutions can reuse one parse. A raw 20 MB
+// source map balloons to ~100-200 MB once parsed; re-parsing on every
+// stack frame (or every request) was the OOM cause on the 1 GB t4g.micro.
+//
+// Consumers are safe for concurrent reads per go-sourcemap docs.
+type parsedSourceMapCache struct {
+	mu    sync.Mutex
+	items map[string]*list.Element
+	order *list.List
+	max   int
+}
+
+type parsedSourceMapEntry struct {
+	key      string
+	consumer *sourcemap.Consumer
+}
+
+var parsedSourceMaps = &parsedSourceMapCache{
+	items: make(map[string]*list.Element),
+	order: list.New(),
+	max:   5,
+}
+
+func (c *parsedSourceMapCache) get(key string) (*sourcemap.Consumer, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if el, ok := c.items[key]; ok {
+		c.order.MoveToFront(el)
+		return el.Value.(*parsedSourceMapEntry).consumer, true
+	}
+	return nil, false
+}
+
+func (c *parsedSourceMapCache) put(key string, consumer *sourcemap.Consumer) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if el, ok := c.items[key]; ok {
+		el.Value.(*parsedSourceMapEntry).consumer = consumer
+		c.order.MoveToFront(el)
+		return
+	}
+	el := c.order.PushFront(&parsedSourceMapEntry{key: key, consumer: consumer})
+	c.items[key] = el
+	for c.order.Len() > c.max {
+		back := c.order.Back()
+		if back == nil {
+			break
+		}
+		evicted := c.order.Remove(back).(*parsedSourceMapEntry)
+		delete(c.items, evicted.key)
+	}
+}
+
+func ParsedSourceMapStats() (items int, max int) {
+	parsedSourceMaps.mu.Lock()
+	defer parsedSourceMaps.mu.Unlock()
+	return parsedSourceMaps.order.Len(), parsedSourceMaps.max
+}
 
 var stackFrameRe = regexp.MustCompile(`^(\s{4})(.+):(\d+):(\d+)$`)
 var jsFuncDeclRe = regexp.MustCompile(
@@ -33,6 +97,15 @@ func ResolveStackTrace(ctx context.Context, projectId uuid.UUID, stackTrace stri
 		return stackTrace
 	}
 
+	// Source-map resolution is opt-in. A 20+ MB minified map parses into
+	// ~100-200 MB of in-memory state; under concurrent load this was pushing
+	// a 1 GB EC2 instance over the OOM line. Default: off. Flip on with
+	// TRACEWAY_SOURCEMAP_RESOLUTION=on in the environment when the host has
+	// enough RAM.
+	if os.Getenv("TRACEWAY_SOURCEMAP_RESOLUTION") != "on" {
+		return stackTrace
+	}
+
 	// Build lookup: basename of source map's file_name (without .map) -> source map
 	// Also keep a map of file_name -> storage_key for direct lookup
 	smByBasename := make(map[string]*models.SourceMap)
@@ -47,6 +120,10 @@ func ResolveStackTrace(ctx context.Context, projectId uuid.UUID, stackTrace stri
 	resolved := make([]string, 0, len(lines))
 	framesResolved := 0
 	maxFrames := 50
+
+	// Per-call consumer map — a given source map is parsed at most once per
+	// ResolveStackTrace invocation even if not in the global cache.
+	localConsumers := make(map[string]*sourcemap.Consumer)
 
 	for _, line := range lines {
 		if framesResolved >= maxFrames {
@@ -71,14 +148,8 @@ func ResolveStackTrace(ctx context.Context, projectId uuid.UUID, stackTrace stri
 			continue
 		}
 
-		data, err := getSourceMapData(ctx, sm.StorageKey)
-		if err != nil {
-			resolved = append(resolved, line)
-			continue
-		}
-
-		consumer, err := sourcemap.Parse("", data)
-		if err != nil {
+		consumer, err := getParsedSourceMap(ctx, sm.StorageKey, localConsumers)
+		if err != nil || consumer == nil {
 			resolved = append(resolved, line)
 			continue
 		}
@@ -137,19 +208,42 @@ func findSourceMap(stackFile string, smByBasename map[string]*models.SourceMap) 
 	return nil
 }
 
-func getSourceMapData(ctx context.Context, storageKey string) ([]byte, error) {
-	if data, ok := cache.SourceMapCache.Get(storageKey); ok {
-		return data, nil
+// getParsedSourceMap returns a reusable *sourcemap.Consumer for the given
+// storage key, parsing at most once per unique source map. Lookup order:
+//
+//  1. Per-call localConsumers (same ResolveStackTrace invocation)
+//  2. Global parsedSourceMaps LRU (cross-request reuse, capped at 5 entries)
+//  3. Raw-bytes cache, then storage.Store.Read — then parse and populate.
+//
+// The raw-bytes cache is still populated so the parse only pays one storage
+// read even when the parsed cache evicts us.
+func getParsedSourceMap(ctx context.Context, storageKey string, localConsumers map[string]*sourcemap.Consumer) (*sourcemap.Consumer, error) {
+	if c, ok := localConsumers[storageKey]; ok {
+		return c, nil
+	}
+	if c, ok := parsedSourceMaps.get(storageKey); ok {
+		localConsumers[storageKey] = c
+		return c, nil
 	}
 
-	data, err := storage.Store.Read(ctx, storageKey)
+	data, ok := cache.SourceMapCache.Get(storageKey)
+	if !ok {
+		var err error
+		data, err = storage.Store.Read(ctx, storageKey)
+		if err != nil {
+			traceway.CaptureException(fmt.Errorf("failed to read source map from storage (key=%s): %w", storageKey, err))
+			return nil, err
+		}
+		cache.SourceMapCache.Put(storageKey, data)
+	}
+
+	consumer, err := sourcemap.Parse("", data)
 	if err != nil {
-		traceway.CaptureException(fmt.Errorf("failed to read source map from storage (key=%s): %w", storageKey, err))
 		return nil, err
 	}
-
-	cache.SourceMapCache.Put(storageKey, data)
-	return data, nil
+	parsedSourceMaps.put(storageKey, consumer)
+	localConsumers[storageKey] = consumer
+	return consumer, nil
 }
 
 func extractFunctionName(sourceContent string, line int) string {
