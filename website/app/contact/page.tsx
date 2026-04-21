@@ -1,188 +1,247 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { ChevronDown } from "lucide-react";
 import { Eyebrow } from "@/components/eyebrow";
 
+const COUNTRIES = [
+  "United States",
+  "Canada",
+  "United Kingdom",
+  "Germany",
+  "France",
+  "Netherlands",
+  "Spain",
+  "Italy",
+  "Sweden",
+  "Poland",
+  "India",
+  "Australia",
+  "Japan",
+  "Singapore",
+  "Brazil",
+  "Mexico",
+  "Other",
+];
+
+const COMPANY_SIZES = [
+  "Just me",
+  "2 – 10",
+  "11 – 50",
+  "51 – 200",
+  "201 – 500",
+  "500+",
+];
+
+const CALENDLY_URL =
+  process.env.NEXT_PUBLIC_CALENDLY_URL ??
+  "https://calendly.com/tracewayapp/demo";
+
 export default function Contact() {
-  const [subject, setSubject] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [customerType, setCustomerType] = useState("");
-  const [status, setStatus] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [country, setCountry] = useState("");
+  const [companySize, setCompanySize] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setStatus("loading");
-    setErrorMessage("");
+    setSubmitting(true);
 
-    try {
-      const res = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subject, email, message, customerType }),
-      });
+    const params = new URLSearchParams();
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    if (fullName) params.set("name", fullName);
+    if (email.trim()) params.set("email", email.trim());
+    if (country) params.set("a1", country);
+    if (companySize) params.set("a2", companySize);
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Something went wrong");
-      }
-
-      setStatus("success");
-      setSubject("");
-      setEmail("");
-      setMessage("");
-      setCustomerType("");
-    } catch (err) {
-      setStatus("error");
-      setErrorMessage(err instanceof Error ? err.message : "Something went wrong");
-    }
+    const url = `${CALENDLY_URL}${
+      params.toString() ? `?${params.toString()}` : ""
+    }`;
+    window.location.href = url;
   }
 
   const inputStyle: React.CSSProperties = {
-    background: "var(--ink-2)",
+    background: "color-mix(in oklab, var(--ink-0) 60%, transparent)",
     border: "1px solid var(--hair-2)",
     color: "var(--fg-0)",
     fontFamily: "var(--font-mono)",
   };
 
+  const labelStyle: React.CSSProperties = {
+    color: "var(--fg-0)",
+    fontFamily: "var(--font-display)",
+  };
+
+  const helperStyle: React.CSSProperties = {
+    color: "var(--fg-3)",
+    fontFamily: "var(--font-mono)",
+  };
+
   return (
     <main className="relative">
-      <section className="wrap py-20">
-        <div className="max-w-xl mx-auto">
-          <Eyebrow>Contact</Eyebrow>
-          <h1 className="mt-4 mb-3">Get in touch</h1>
-          <p className="mb-10" style={{ color: "var(--fg-2)" }}>
-            Have a question or need help? Send us a message and we&apos;ll get
-            back to you.
-          </p>
-
-          {status === "success" ? (
-            <div
-              className="rounded-[10px] p-6 text-center"
-              style={{
-                background: "color-mix(in oklab, var(--ok) 12%, transparent)",
-                border: "1px solid color-mix(in oklab, var(--ok) 30%, transparent)",
-                color: "var(--ok)",
-              }}
+      <section className="hero gridbg relative overflow-hidden pt-20 pb-24">
+        <div className="wrap relative z-10 max-w-3xl mx-auto">
+          <div className="text-center mb-10">
+            <Eyebrow>Book a demo</Eyebrow>
+            <h1 className="mt-4">
+              We&apos;d love to hear from you.{" "}
+              <em>Submit the form to pick a time.</em>
+            </h1>
+            <p
+              className="mt-5 text-[17px] max-w-[560px] mx-auto"
+              style={{ color: "var(--fg-2)" }}
             >
-              <p className="font-medium">
-                Thank you for reaching out! We&apos;ll get back to you soon.
-              </p>
+              Tell us a bit about you and your team. On submit we&apos;ll hand
+              you over to Calendly so you can grab a 30-minute slot.
+            </p>
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            className="rounded-[14px] p-6 md:p-8"
+            style={{
+              background:
+                "linear-gradient(180deg, color-mix(in oklab, var(--ink-2) 80%, transparent), color-mix(in oklab, var(--ink-1) 60%, transparent))",
+              border: "1px solid var(--hair-2)",
+              boxShadow: "0 30px 60px -30px rgba(0, 0, 0, 0.5)",
+            }}
+          >
+            {/* Name row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First name"
+                aria-label="First name"
+                className="w-full px-4 py-3.5 rounded-md text-[15px] outline-none focus:border-[color:var(--a1)] transition-colors"
+                style={inputStyle}
+              />
+              <input
+                type="text"
+                required
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last name"
+                aria-label="Last name"
+                className="w-full px-4 py-3.5 rounded-md text-[15px] outline-none focus:border-[color:var(--a1)] transition-colors"
+                style={inputStyle}
+              />
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label
-                  htmlFor="subject"
-                  className="block text-sm font-medium mb-1.5"
-                  style={{ color: "var(--fg-0)", fontFamily: "var(--font-display)" }}
-                >
-                  Subject
-                </label>
-                <input
-                  id="subject"
-                  type="text"
-                  required
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="w-full rounded-md px-3 py-2.5 text-sm outline-none focus:ring-2 transition"
-                  style={{
-                    ...inputStyle,
-                    ["--tw-ring-color" as string]: "var(--a1)",
-                  }}
-                  placeholder="What can we help with?"
-                />
-              </div>
 
-              <div>
-                <label
-                  htmlFor="email"
-                  className="block text-sm font-medium mb-1.5"
-                  style={{ color: "var(--fg-0)", fontFamily: "var(--font-display)" }}
-                >
-                  Email
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-md px-3 py-2.5 text-sm outline-none focus:ring-2 transition"
-                  style={inputStyle}
-                  placeholder="you@example.com"
-                />
-              </div>
+            {/* Email */}
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email*"
+              aria-label="Email address"
+              className="mt-4 w-full px-4 py-3.5 rounded-md text-[15px] outline-none focus:border-[color:var(--a1)] transition-colors"
+              style={inputStyle}
+            />
 
-              <div>
-                <label
-                  htmlFor="customerType"
-                  className="block text-sm font-medium mb-1.5"
-                  style={{ color: "var(--fg-0)", fontFamily: "var(--font-display)" }}
-                >
-                  Customer type
-                </label>
+            {/* Country */}
+            <div className="mt-8">
+              <label
+                htmlFor="country"
+                className="block text-[15px] font-medium"
+                style={labelStyle}
+              >
+                Which country is your company&apos;s headquarters based in?{" "}
+                <span style={{ color: "var(--crit)" }}>*</span>
+              </label>
+              <p className="mt-1 text-[13px]" style={helperStyle}>
+                This info will help us connect you to the right person.
+              </p>
+              <div className="mt-3 relative">
                 <select
-                  id="customerType"
+                  id="country"
                   required
-                  value={customerType}
-                  onChange={(e) => setCustomerType(e.target.value)}
-                  className="w-full rounded-md px-3 py-2.5 text-sm outline-none focus:ring-2 transition"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  className="w-full appearance-none px-4 py-3.5 pr-10 rounded-md text-[15px] outline-none focus:border-[color:var(--a1)] transition-colors"
                   style={inputStyle}
                 >
                   <option value="" disabled>
                     Select an option
                   </option>
-                  <option value="Existing Customer">Existing Customer</option>
-                  <option value="New Customer">New Customer</option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
                 </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="message"
-                  className="block text-sm font-medium mb-1.5"
-                  style={{ color: "var(--fg-0)", fontFamily: "var(--font-display)" }}
-                >
-                  Message
-                </label>
-                <textarea
-                  id="message"
-                  required
-                  rows={5}
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  className="w-full rounded-md px-3 py-2.5 text-sm outline-none focus:ring-2 transition resize-none"
-                  style={inputStyle}
-                  placeholder="Tell us more..."
+                <ChevronDown
+                  className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  size={18}
+                  style={{ color: "var(--fg-3)" }}
                 />
               </div>
+            </div>
 
-              {status === "error" && (
-                <div
-                  className="rounded-md px-4 py-3 text-sm"
-                  style={{
-                    background: "color-mix(in oklab, var(--crit) 12%, transparent)",
-                    border: "1px solid color-mix(in oklab, var(--crit) 30%, transparent)",
-                    color: "var(--crit)",
-                  }}
+            {/* Company size */}
+            <div className="mt-7">
+              <label
+                htmlFor="company-size"
+                className="block text-[15px] font-medium"
+                style={labelStyle}
+              >
+                How many employees work at your company?{" "}
+                <span style={{ color: "var(--crit)" }}>*</span>
+              </label>
+              <p className="mt-1 text-[13px]" style={helperStyle}>
+                This info will help us connect you to the right person.
+              </p>
+              <div className="mt-3 relative">
+                <select
+                  id="company-size"
+                  required
+                  value={companySize}
+                  onChange={(e) => setCompanySize(e.target.value)}
+                  className="w-full appearance-none px-4 py-3.5 pr-10 rounded-md text-[15px] outline-none focus:border-[color:var(--a1)] transition-colors"
+                  style={inputStyle}
                 >
-                  {errorMessage}
-                </div>
-              )}
+                  <option value="" disabled>
+                    Select an option
+                  </option>
+                  {COMPANY_SIZES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  size={18}
+                  style={{ color: "var(--fg-3)" }}
+                />
+              </div>
+            </div>
 
+            <div className="mt-8 flex justify-center">
               <button
                 type="submit"
-                disabled={status === "loading"}
-                className="btn btn-accent w-full justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={submitting}
+                className="btn btn-accent px-10 py-3 min-w-[200px] justify-center disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {status === "loading" ? "Sending..." : "Send Message"}
+                {submitting ? "Redirecting…" : "Submit"}
               </button>
-            </form>
-          )}
+            </div>
+
+            <p
+              className="mt-5 text-center text-[12px]"
+              style={{
+                color: "var(--fg-3)",
+                fontFamily: "var(--font-mono)",
+              }}
+            >
+              We&apos;ll redirect you to Calendly with your info pre-filled.
+            </p>
+          </form>
         </div>
       </section>
     </main>

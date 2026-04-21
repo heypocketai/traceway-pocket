@@ -13,6 +13,7 @@ import {
   Bug,
   Workflow,
   Activity,
+  Smartphone,
   ArrowUpRight,
 } from "lucide-react";
 import { MobileNav } from "@/components/mobile-nav";
@@ -70,6 +71,12 @@ const SPECIALIZED: NavItem[] = [
     description: "P50/P95/P99 percentiles, waterfall traces.",
     href: "/product/performance",
     icon: Activity,
+  },
+  {
+    title: "Flutter Session Replay",
+    description: "Open-source mobile replay — 10s before every exception.",
+    href: "/product/flutter-session-replay",
+    icon: Smartphone,
   },
 ];
 

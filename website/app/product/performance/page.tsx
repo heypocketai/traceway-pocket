@@ -11,9 +11,9 @@ import { AuroraBackground } from "@/components/aurora-background";
 export default function PerformancePage() {
   return (
     <main className="relative">
-      <section className="hero gridbg relative">
+      <section className="hero hero-product gridbg relative">
         <AuroraBackground variant="hero" />
-        <div className="wrap relative z-10 max-w-3xl">
+        <div className="wrap relative z-10">
           <Chip>
             <Activity className="h-3 w-3 inline mr-1" />
             Performance

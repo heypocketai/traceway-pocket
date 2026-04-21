@@ -22,9 +22,9 @@ import { Terminal } from "@/components/terminal";
 export default function MetricsPage() {
   return (
     <main className="relative">
-      <section className="hero gridbg relative">
+      <section className="hero hero-product gridbg relative">
         <AuroraBackground variant="hero" />
-        <div className="wrap relative z-10 max-w-3xl">
+        <div className="wrap relative z-10">
           <Chip variant="ok">
             <BarChart3 className="h-3 w-3 inline mr-1" />
             Metrics

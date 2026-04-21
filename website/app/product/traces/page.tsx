@@ -14,9 +14,9 @@ import { DistributedTraceVisual } from "@/components/distributed-trace-visual";
 export default function TracesPage() {
   return (
     <main className="relative">
-      <section className="hero gridbg relative">
+      <section className="hero hero-product gridbg relative">
         <AuroraBackground variant="hero" />
-        <div className="wrap relative z-10 max-w-3xl">
+        <div className="wrap relative z-10">
           <Chip>
             <Network className="h-3 w-3 inline mr-1" />
             Traces

@@ -405,6 +405,24 @@
     padding: 80px 0 60px;
     position: relative;
   }
+
+  /* Compact hero variant for product / cloud pages — narrower container
+     means the huge home-size H1 would wrap to 3 lines and dominate the fold. */
+  .hero-product {
+    padding: 56px 0 48px;
+  }
+  .hero-product h1 {
+    font-size: clamp(34px, 4vw, 54px);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+  }
+  .hero-product .hero-sub {
+    font-size: 17px;
+    margin-top: 18px;
+  }
+  .hero-product .hero-cta-row {
+    margin-top: 24px;
+  }
   .hero h1 em {
     font-style: normal;
     background: linear-gradient(90deg, var(--a2), var(--a1) 60%, var(--a3));
