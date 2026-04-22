@@ -45,3 +45,4 @@ backend/static/dist/
 /examples/express-otel/node_modules
 /examples/hono-otel/node_modules
 /examples/nestjs-otel/node_modules
+/website/.wrangler
