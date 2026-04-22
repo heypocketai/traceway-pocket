@@ -29,7 +29,7 @@
 		external?: boolean;
 	}
 
-	const hiddenForFrontend = new Set(['Dashboard', 'Endpoints', 'Tasks', 'Metrics', 'AI Traces']);
+	const hiddenForFrontend = new Set(['Dashboard', 'Logs', 'Endpoints', 'Tasks', 'Metrics', 'AI Traces']);
 	const hiddenForCloudflare = new Set(['Metrics']);
 
 	const allSidebarItems: SidebarItem[] = [
