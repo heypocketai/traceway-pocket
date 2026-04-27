@@ -148,7 +148,7 @@ Traceway integrates with the tools you already use. Every integration ships trac
 <table>
 <tbody>
 <tr>
-<td align="center" width="150"><a href="https://docs.tracewayapp.com/client/openrouter"><img src="./docs/public/openrouter.png" height="28" alt="OpenRouter" /></a><br/><b>OpenRouter</b></a></td>
+<td align="center" width="150"><a href="https://docs.tracewayapp.com/client/openrouter"><img src="./docs/public/openrouter.png" height="28" alt="OpenRouter" style="filter: contrast(0.5);" /><br/><b>OpenRouter</b></a></td>
 </tr>
 </tbody>
 </table>
