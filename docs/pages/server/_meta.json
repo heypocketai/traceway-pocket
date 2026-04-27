@@ -3,6 +3,7 @@
   "all-in-one": "All-in-One Container",
   "docker-compose": "Docker Compose",
   "minimal": "Minimal Container",
+  "sqlite": "SQLite",
   "local-setup": "Local Setup",
   "haloy": "Haloy"
 }

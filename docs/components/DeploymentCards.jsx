@@ -24,6 +24,13 @@ const DEPLOYMENTS = [
       "Lightweight Alpine image (~20-30MB). Connect to your own external ClickHouse and PostgreSQL.",
   },
   {
+    title: "SQLite",
+    href: "/server/sqlite",
+    subtitle: "Backend + Frontend + SQLite",
+    description:
+      "Single Alpine container with embedded SQLite. No external databases needed. Optional S3 for source maps and recordings.",
+  },
+  {
     title: "Local Setup",
     href: "/server/local-setup",
     subtitle: "Backend + Frontend from source",
