@@ -78,10 +78,19 @@ func (c *metricQueryController) Query(ctx *gin.Context) {
 			agg = "avg"
 		}
 
+		spanName := fmt.Sprintf("query metric: %s agg=%s", q.Name, agg)
+		if q.GroupBy != "" {
+			spanName += " group=" + q.GroupBy
+		}
+		if len(q.TagFilters) > 0 {
+			spanName += fmt.Sprintf(" filters=%d", len(q.TagFilters))
+		}
+		span := traceway.StartSpan(ctx, spanName)
 		series, err := repositories.MetricPointRepository.QueryTimeSeries(
 			ctx, projectId, q.Name, req.From, req.To,
 			req.IntervalMinutes, agg, q.TagFilters, q.GroupBy,
 		)
+		span.End()
 		if err != nil {
 			ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to query metric %s: %w", q.Name, err))
 			return
@@ -127,7 +136,9 @@ func (c *metricQueryController) Discover(ctx *gin.Context) {
 		}
 	}
 
+	span := traceway.StartSpan(ctx, "discover metrics")
 	discovered, err := repositories.MetricPointRepository.DiscoverMetrics(ctx, projectId, from, to)
+	span.End()
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to discover metrics: %w", err))
 		return
@@ -173,7 +184,9 @@ func (c *metricQueryController) DiscoverTags(ctx *gin.Context) {
 	from := time.Now().AddDate(0, 0, -7)
 	to := time.Now()
 
+	span := traceway.StartSpan(ctx, fmt.Sprintf("discover tag values: %s.%s", name, key))
 	values, err := repositories.MetricPointRepository.DiscoverTagValues(ctx, projectId, name, key, from, to)
+	span.End()
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to discover tag values: %w", err))
 		return

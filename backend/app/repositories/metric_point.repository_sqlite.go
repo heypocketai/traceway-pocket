@@ -4,6 +4,7 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -42,10 +43,10 @@ func (r *metricPointRepository) InsertAsync(ctx context.Context, points []models
 		query, args, err := lit.ParseNamedQuery(db.Driver,
 			"INSERT INTO metric_points (project_id, name, value, tags, recorded_at) VALUES (:project_id, :name, :value, :tags, :recorded_at)",
 			lit.P{
-				"project_id": p.ProjectId,
-				"name":       p.Name,
-				"value":      p.Value,
-				"tags":       tagsVal,
+				"project_id":  p.ProjectId,
+				"name":        p.Name,
+				"value":       p.Value,
+				"tags":        tagsVal,
 				"recorded_at": NewSQLiteTime(p.RecordedAt),
 			})
 		if err != nil {
@@ -143,45 +144,47 @@ func (r *metricPointRepository) QueryTimeSeries(ctx context.Context, projectId u
 }
 
 func (r *metricPointRepository) DiscoverMetrics(ctx context.Context, projectId uuid.UUID, from, to time.Time) ([]models.DiscoveredMetric, error) {
-	type nameRow struct {
-		Name string `lit:"name"`
-	}
-	lit.RegisterModel[nameRow](db.Driver)
-
-	names, err := lit.SelectNamed[nameRow](db.TelemetryDB,
-		"SELECT DISTINCT name FROM metric_points WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to ORDER BY name ASC",
+	query, args, err := lit.ParseNamedQuery(db.Driver,
+		`SELECT name, j.key AS tag_key
+		FROM metric_points
+		LEFT JOIN json_each(tags) j
+		WHERE project_id = :project_id AND recorded_at >= :from AND recorded_at <= :to
+		GROUP BY name, j.key
+		ORDER BY name ASC, j.key ASC`,
 		lit.P{"project_id": projectId, "from": NewSQLiteTime(from), "to": NewSQLiteTime(to)})
 	if err != nil {
 		return nil, err
 	}
 
-	var metrics []models.DiscoveredMetric
-	for _, n := range names {
-		type keyRow struct {
-			Key string `lit:"key"`
-		}
-		lit.RegisterModel[keyRow](db.Driver)
+	rows, err := db.TelemetryDB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
-		tagKeys, err := lit.SelectNamed[keyRow](db.TelemetryDB,
-			`SELECT DISTINCT j.key FROM metric_points, json_each(tags) j
-			WHERE project_id = :project_id AND name = :name AND recorded_at >= :from AND recorded_at <= :to
-			ORDER BY j.key ASC`,
-			lit.P{"project_id": projectId, "name": n.Name, "from": NewSQLiteTime(from), "to": NewSQLiteTime(to)})
-		if err != nil {
+	byName := make(map[string]*models.DiscoveredMetric)
+	order := make([]string, 0)
+	for rows.Next() {
+		var name string
+		var tagKey sql.NullString
+		if err := rows.Scan(&name, &tagKey); err != nil {
 			return nil, err
 		}
-
-		keys := make([]string, 0, len(tagKeys))
-		for _, k := range tagKeys {
-			keys = append(keys, k.Key)
+		m, ok := byName[name]
+		if !ok {
+			m = &models.DiscoveredMetric{Name: name, TagKeys: []string{}}
+			byName[name] = m
+			order = append(order, name)
 		}
-
-		metrics = append(metrics, models.DiscoveredMetric{
-			Name:    n.Name,
-			TagKeys: keys,
-		})
+		if tagKey.Valid && tagKey.String != "" {
+			m.TagKeys = append(m.TagKeys, tagKey.String)
+		}
 	}
 
+	metrics := make([]models.DiscoveredMetric, 0, len(order))
+	for _, n := range order {
+		metrics = append(metrics, *byName[n])
+	}
 	return metrics, nil
 }
 
