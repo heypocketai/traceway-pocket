@@ -6,6 +6,9 @@ import {
   Terminal as TerminalIcon,
   MousePointer2,
   BookOpen,
+  Globe,
+  Route,
+  Bookmark,
 } from "lucide-react";
 
 import { Chip } from "@/components/chip";
@@ -193,19 +196,67 @@ export default function FlutterSessionReplayPage() {
             iconColor="var(--a2)"
           >
             <p>
-              Every tap, scroll, and gesture for the last 60 seconds — synced
-              frame-for-frame with the recording.
+              Every tap and gesture rendered onto the recording, frame-synced
+              with the last 10 seconds before the crash.
             </p>
           </BentoCell>
           <BentoCell
             size="med"
             icon={TerminalIcon}
-            title="Console & exceptions"
+            title="Console logs"
             iconColor="var(--warn)"
           >
             <p>
-              <code>print</code> output, caught <code>FlutterError</code>s, and
-              the full symbolicated stack trace — all stitched to the timeline.
+              Every <code>print</code> and <code>debugPrint</code> from the
+              last 10 seconds — captured via a Zone hook, no manual wiring.
+              Capped at 200 lines.
+            </p>
+          </BentoCell>
+          <BentoCell
+            size="med"
+            icon={Globe}
+            title="HTTP requests"
+            iconColor="var(--a1)"
+          >
+            <p>
+              Method, URL, status, duration, and byte counts for every dart:io
+              HTTP call. Catches <code>package:http</code>, Dio, Firebase, and
+              anything on the platform client — no per-call instrumentation.
+            </p>
+          </BentoCell>
+          <BentoCell
+            size="med"
+            icon={Route}
+            title="Navigation timeline"
+            iconColor="var(--a2)"
+          >
+            <p>
+              Every push, pop, and replace from any <code>Navigator</code> —
+              attach <code>Traceway.navigatorObserver</code> once and the
+              route history rides with every crash.
+            </p>
+          </BentoCell>
+          <BentoCell
+            size="med"
+            icon={Bookmark}
+            title="Custom actions"
+            iconColor="var(--warn)"
+          >
+            <p>
+              Tag your own breadcrumbs — <code>cart.add_item</code>,{" "}
+              <code>auth.login_succeeded</code> — with{" "}
+              <code>Traceway.recordAction</code>. Capped at 200 entries.
+            </p>
+          </BentoCell>
+          <BentoCell
+            size="med"
+            icon={TerminalIcon}
+            title="Full stack trace"
+            iconColor="var(--a1)"
+          >
+            <p>
+              Caught <code>FlutterError</code>s and uncaught async exceptions,
+              symbolicated and stitched to the same timeline as the replay.
             </p>
           </BentoCell>
         </BentoGrid>

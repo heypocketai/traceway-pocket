@@ -63,6 +63,11 @@ TracewayClient.instance?.captureMessage('User completed onboarding');
 | `persistToDisk` | `bool` | `true` | Persist pending exceptions to disk so they survive app restarts |
 | `maxLocalFiles` | `int` | `5` | Max exception files stored on disk |
 | `localFileMaxAgeHours` | `int` | `12` | Hours after which unsynced local files are deleted |
+| `captureLogs` | `bool` | `true` | Mirror every `print` / `debugPrint` into the rolling log buffer |
+| `captureNetwork` | `bool` | `true` | Install `HttpOverrides.global` to record every dart:io HTTP call |
+| `captureNavigation` | `bool` | `true` | Record navigation transitions reported by `Traceway.navigatorObserver` |
+| `eventsWindow` | `Duration` | `10s` | Rolling window kept in the log/action buffers |
+| `eventsMaxCount` | `int` | `200` | Hard cap applied independently to logs and actions |
 
 ```dart
 Traceway.run(
@@ -121,6 +126,93 @@ When `screenCapture` is set to `true`:
 - On exception, the last ~10 seconds are encoded to MP4 and sent alongside the error report.
 - Touch and click positions are rendered as blue circles on the captured frames. These overlays are invisible to the user during normal use.
 - Recordings appear in the Traceway dashboard alongside the stack trace, giving you full visual context for every error.
+
+## Logs & Actions
+
+Every captured exception ships with the last ~10 seconds of session context, attached to the same session recording as the video. Two independent rolling buffers — **logs** and **actions** — are kept in memory, each capped at 200 entries by default.
+
+### Logs
+
+Every `print` and `debugPrint` line is mirrored into the log buffer via a Zone print override installed by `Traceway.run()`. Console output behaves normally; it just gets a copy.
+
+`dart:developer.log` is **not** captured — it doesn't flow through the Zone print hook.
+
+### Actions
+
+Three kinds of actions are collected:
+
+- **Network** — every dart:io HTTP request (method, URL, status, duration, request/response byte counts). `HttpOverrides.global` is installed by `Traceway.run()`, so this catches `package:http`, Dio, Firebase, and any other library that sits on the dart:io HttpClient on native platforms.
+- **Navigation** — push / pop / replace / remove transitions, recorded by `Traceway.navigatorObserver`. Wire it into your app's navigator:
+
+  ```dart
+  MaterialApp(
+    navigatorObservers: [Traceway.navigatorObserver],
+    home: const HomePage(),
+  );
+  ```
+
+- **Custom** — anything your app records explicitly:
+
+  ```dart
+  Traceway.recordAction(
+    category: 'cart',
+    name: 'add_item',
+    data: {'sku': 'SKU-123', 'qty': 2},
+  );
+  ```
+
+### Wire shape
+
+Logs and actions are sent to the backend inside the same `sessionRecordings` entry that carries the MP4 — they're stored under separate `logs` and `actions` arrays:
+
+```json
+{
+  "sessionRecordings": [
+    {
+      "exceptionId": "...",
+      "events": [{"type": "flutter_video", "data": "...", "fps": 15}],
+      "logs": [
+        {"type": "log", "timestamp": "...", "level": "info", "message": "user tapped pay"}
+      ],
+      "actions": [
+        {"type": "navigation", "action": "push", "from": "/", "to": "/cart", "timestamp": "..."},
+        {"type": "network", "method": "GET", "url": "...", "statusCode": 200, "durationMs": 86, "timestamp": "..."},
+        {"type": "custom", "category": "cart", "name": "add_item", "data": {"sku": "SKU-1"}, "timestamp": "..."}
+      ]
+    }
+  ]
+}
+```
+
+A session recording entry is created for every captured exception that has any timeline data — even when `screenCapture: false` and there's no video.
+
+### Network capture on Flutter web
+
+`HttpOverrides.global` does not run on Flutter web. Use `TracewayHttpClient` instead — it's a drop-in `http.Client` you can use directly or pass to libraries that accept a custom client (Dio, Chopper, etc.):
+
+```dart
+import 'package:traceway/traceway.dart';
+
+final client = TracewayHttpClient();
+final res = await client.get(Uri.parse('https://api.example.com/users'));
+```
+
+### Disabling channels
+
+Each channel can be turned off individually via `TracewayOptions`:
+
+```dart
+Traceway.run(
+  connectionString: 'your-token@https://traceway.example.com/api/report',
+  options: TracewayOptions(
+    screenCapture: true,
+    captureLogs: true,        // print / debugPrint
+    captureNetwork: true,     // HttpOverrides
+    captureNavigation: true,  // NavigatorObserver
+  ),
+  child: MyApp(),
+);
+```
 
 ## Privacy Masking
 
