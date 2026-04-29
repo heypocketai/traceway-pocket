@@ -155,10 +155,16 @@ Traceway integrates with the tools you already use. Every integration ships trac
 
 ## Screenshots
 
-|                                                                                               |                                                                                                              |
-| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Logs — trace-linked search**<br>![Logs](./website/public/images/logs-search-and-detail.png) | **Span waterfall**<br>![Spans](./website/public/images/traces-spans-waterfall.png)                           |
-| **Metrics — application dashboard**<br>![Metrics](./website/public/images/metrics-application-dashboard.png) | **Exceptions — grouped & ranked**<br>![Exceptions](./website/public/images/exceptions-grouped-ranked.png)    |
+<table width="100%">
+<tr>
+<td width="50%" valign="top"><b>Logs — trace-linked search</b><br><img src="./website/public/images/logs-search-and-detail.png" alt="Logs" /></td>
+<td width="50%" valign="top"><b>Span waterfall</b><br><img src="./website/public/images/traces-spans-waterfall.png" alt="Spans" /></td>
+</tr>
+<tr>
+<td width="50%" valign="top"><b>Metrics — application dashboard</b><br><img src="./website/public/images/metrics-application-dashboard.png" alt="Metrics" /></td>
+<td width="50%" valign="top"><b>Exceptions — grouped & ranked</b><br><img src="./website/public/images/exceptions-grouped-ranked.png" alt="Exceptions" /></td>
+</tr>
+</table>
 
 ## Tech Stack
 
