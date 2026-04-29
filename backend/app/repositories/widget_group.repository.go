@@ -43,7 +43,7 @@ func (r *widgetGroupRepository) Delete(tx *sql.Tx, id int) error {
 func (r *widgetGroupRepository) FindWidgetsByGroup(tx *sql.Tx, widgetGroupId int) ([]*models.WidgetGroupWidget, error) {
 	return lit.SelectNamed[models.WidgetGroupWidget](
 		tx,
-		"SELECT id, widget_group_id, title, widget_type, config, position, created_at, updated_at FROM widget_group_widgets WHERE widget_group_id = :wg_id ORDER BY position ASC",
+		"SELECT id, widget_group_id, title, widget_type, config, position, is_starred, created_at, updated_at FROM widget_group_widgets WHERE widget_group_id = :wg_id ORDER BY position ASC",
 		lit.P{"wg_id": widgetGroupId},
 	)
 }
@@ -51,8 +51,20 @@ func (r *widgetGroupRepository) FindWidgetsByGroup(tx *sql.Tx, widgetGroupId int
 func (r *widgetGroupRepository) FindWidgetById(tx *sql.Tx, id int) (*models.WidgetGroupWidget, error) {
 	return lit.SelectSingleNamed[models.WidgetGroupWidget](
 		tx,
-		"SELECT id, widget_group_id, title, widget_type, config, position, created_at, updated_at FROM widget_group_widgets WHERE id = :id",
+		"SELECT id, widget_group_id, title, widget_type, config, position, is_starred, created_at, updated_at FROM widget_group_widgets WHERE id = :id",
 		lit.P{"id": id},
+	)
+}
+
+func (r *widgetGroupRepository) FindStarredWidgetsByProject(tx *sql.Tx, projectId uuid.UUID) ([]*models.WidgetGroupWidget, error) {
+	return lit.SelectNamed[models.WidgetGroupWidget](
+		tx,
+		`SELECT wgw.id, wgw.widget_group_id, wgw.title, wgw.widget_type, wgw.config, wgw.position, wgw.is_starred, wgw.created_at, wgw.updated_at
+		FROM widget_group_widgets wgw
+		JOIN widget_groups wg ON wg.id = wgw.widget_group_id
+		WHERE wg.project_id = :project_id AND wgw.is_starred = :starred
+		ORDER BY wgw.updated_at DESC`,
+		lit.P{"project_id": projectId, "starred": true},
 	)
 }
 

@@ -6,7 +6,7 @@
     import { getTimezone } from '$lib/state/timezone.svelte';
     import { formatDateTime } from '$lib/utils/formatters';
     import { StackTraceCard, EventCard, EventsTable, PageHeader } from '$lib/components/issues';
-    import type { ExceptionOccurrence, LinkedTrace } from '$lib/types/exceptions';
+    import type { ExceptionOccurrence, LinkedTrace, SessionRecording } from '$lib/types/exceptions';
 	import { createSmartBackHandler } from '$lib/utils/back-navigation';
 	import { resolve } from '$app/paths';
 	import ArchiveConfirmationDialog from '$lib/components/archive-confirmation-dialog.svelte';
@@ -24,7 +24,7 @@
     let notFound = $state(false);
     let total = $state(0);
     let linkedTrace = $state<LinkedTrace | null>(null);
-    let sessionRecordingEvents = $state<unknown[] | null>(null);
+    let sessionRecording = $state<SessionRecording | null>(null);
     let showArchiveDialog = $state(false);
     let archiving = $state(false);
 
@@ -39,13 +39,13 @@
         error = '';
         notFound = false;
         linkedTrace = null;
-        sessionRecordingEvents = null;
+        sessionRecording = null;
 
         try {
             // Load the specific exception by ID
             const exceptionResponse = await api.post(`/exception-stack-traces/by-id/${data.exceptionId}`, {}, { projectId: projectsState.currentProjectId ?? undefined });
             occurrence = exceptionResponse.exception;
-            sessionRecordingEvents = exceptionResponse.sessionRecordingEvents ?? null;
+            sessionRecording = exceptionResponse.sessionRecording ?? null;
 
             if (!occurrence) {
                 notFound = true;
@@ -174,7 +174,7 @@
         <EventCard
             {occurrence}
             {linkedTrace}
-            {sessionRecordingEvents}
+            {sessionRecording}
             title="Event"
             description="Details for this specific occurrence"
         />

@@ -10,11 +10,13 @@
         h1 { margin-bottom: 8px; }
         p { color: #555; line-height: 1.5; }
         code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-        .buttons { display: flex; gap: 12px; margin-bottom: 24px; }
+        .buttons { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
         .btn { color: #fff; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
         .btn:hover { opacity: 0.9; }
         .btn-error { background: #dc2626; }
         .btn-success { background: #16a34a; }
+        .btn-logs { background: #2563eb; }
+        .btn-network { background: #7c3aed; }
         .btn-clear { background: #6b7280; }
         #log { background: #111; color: #0f0; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 13px; min-height: 200px; white-space: pre-wrap; }
     </style>
@@ -30,6 +32,8 @@
     <div class="buttons">
         <button class="btn btn-error" id="btn-error">Call Backend Error Endpoint</button>
         <button class="btn btn-success" id="btn-success">Call Backend Success Endpoint</button>
+        <button class="btn btn-logs" id="btn-logs">Emit Console Logs</button>
+        <button class="btn btn-network" id="btn-network">Fire Network Requests</button>
         <button class="btn btn-clear" id="btn-clear">Clear Log</button>
     </div>
 

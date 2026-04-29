@@ -1,0 +1,1 @@
+ALTER TABLE widget_group_widgets ADD COLUMN is_starred BOOLEAN NOT NULL DEFAULT FALSE

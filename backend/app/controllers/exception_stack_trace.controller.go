@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"bytes"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -40,10 +42,35 @@ type ExceptionDetailRequest struct {
 }
 
 type ExceptionDetailResponse struct {
-	Group                  *models.ExceptionGroup       `json:"group"`
-	Occurrences            []models.ExceptionStackTrace `json:"occurrences"`
-	Pagination             Pagination                   `json:"pagination"`
-	SessionRecordingEvents json.RawMessage              `json:"sessionRecordingEvents,omitempty"`
+	Group            *models.ExceptionGroup       `json:"group"`
+	Occurrences      []models.ExceptionStackTrace `json:"occurrences"`
+	Pagination       Pagination                   `json:"pagination"`
+	SessionRecording json.RawMessage              `json:"sessionRecording,omitempty"`
+}
+
+// wrapLegacyRecording handles the case where a recording in blob storage was
+// written before the logs/actions wrapper landed. Older files contain just the
+// events array as their top-level JSON; newer files contain a wrapper object
+// with `events` / `logs` / `actions` / `startedAt` / `endedAt`. Returns the
+// new shape either way so the frontend never branches on file format.
+func wrapLegacyRecording(raw []byte) json.RawMessage {
+	trimmed := bytes.TrimLeft(raw, " \t\r\n")
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		wrapped := make([]byte, 0, len(raw)+len(`{"events":}`))
+		wrapped = append(wrapped, []byte(`{"events":`)...)
+		wrapped = append(wrapped, raw...)
+		wrapped = append(wrapped, '}')
+		return json.RawMessage(wrapped)
+	}
+	return json.RawMessage(raw)
+}
+
+func loadSessionRecording(ctx context.Context, filePath string) (json.RawMessage, error) {
+	raw, err := storage.Store.Read(ctx, filePath)
+	if err != nil {
+		return nil, err
+	}
+	return wrapLegacyRecording(raw), nil
 }
 
 func (e exceptionStackTraceController) FindGrouppedExceptionStackTraces(c *gin.Context) {
@@ -152,9 +179,9 @@ func (e exceptionStackTraceController) FindByHash(c *gin.Context) {
 	if len(occurrences) > 0 {
 		filePath, err := repositories.SessionRecordingRepository.FindByExceptionId(c, projectId, occurrences[0].Id)
 		if err == nil && filePath != "" {
-			eventsData, err := storage.Store.Read(c, filePath)
+			recording, err := loadSessionRecording(c, filePath)
 			if err == nil {
-				response.SessionRecordingEvents = json.RawMessage(eventsData)
+				response.SessionRecording = recording
 			} else {
 				traceway.CaptureException(fmt.Errorf("failed to read session recording (key=%s): %w", filePath, err))
 			}
@@ -250,9 +277,9 @@ func (e exceptionStackTraceController) FindById(c *gin.Context) {
 
 	filePath, err := repositories.SessionRecordingRepository.FindByExceptionId(c, projectId, exceptionId)
 	if err == nil && filePath != "" {
-		eventsData, err := storage.Store.Read(c, filePath)
+		recording, err := loadSessionRecording(c, filePath)
 		if err == nil {
-			response["sessionRecordingEvents"] = json.RawMessage(eventsData)
+			response["sessionRecording"] = recording
 		} else {
 			traceway.CaptureException(fmt.Errorf("failed to read session recording (key=%s): %w", filePath, err))
 		}

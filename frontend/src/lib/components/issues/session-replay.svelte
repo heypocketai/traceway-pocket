@@ -13,12 +13,24 @@
 
 	interface Props {
 		events: (eventWithTime & { data?: { href?: string } })[] | FlutterVideoEvent[] | null;
+		onTimeUpdate?: (ms: number) => void;
 	}
 
-	let { events }: Props = $props();
+	let { events, onTimeUpdate }: Props = $props();
 	let container: HTMLElement;
 	let player: any = null;
 	let resizeObserver: ResizeObserver | null = null;
+	let rafId: number | null = null;
+	let lastReportedMs = -1;
+
+	export function seek(offsetMs: number) {
+		const ms = Math.max(0, offsetMs);
+		if (isFlutterVideo && videoEl) {
+			videoEl.currentTime = ms / 1000;
+		} else if (player) {
+			player.goto(ms, false);
+		}
+	}
 
 	let isFlutterVideo = $derived(
 		events && events.length > 0 && (events[0] as any)?.type === 'flutter_video'
@@ -102,8 +114,9 @@
 	$effect(() => {
 		if (!videoEl) return;
 
-		const onTimeUpdate = () => {
+		const onVideoTimeUpdate = () => {
 			if (!dragging) currentTime = videoEl.currentTime;
+			onTimeUpdate?.(videoEl.currentTime * 1000);
 		};
 		const onLoadedMetadata = () => {
 			duration = videoEl.duration;
@@ -118,14 +131,14 @@
 			isFullscreen = !!document.fullscreenElement;
 		};
 
-		videoEl.addEventListener('timeupdate', onTimeUpdate);
+		videoEl.addEventListener('timeupdate', onVideoTimeUpdate);
 		videoEl.addEventListener('loadedmetadata', onLoadedMetadata);
 		videoEl.addEventListener('play', onPlay);
 		videoEl.addEventListener('pause', onPause);
 		document.addEventListener('fullscreenchange', onFullscreenChange);
 
 		return () => {
-			videoEl.removeEventListener('timeupdate', onTimeUpdate);
+			videoEl.removeEventListener('timeupdate', onVideoTimeUpdate);
 			videoEl.removeEventListener('loadedmetadata', onLoadedMetadata);
 			videoEl.removeEventListener('play', onPlay);
 			videoEl.removeEventListener('pause', onPause);
@@ -176,9 +189,25 @@
 			}
 		});
 		resizeObserver.observe(container);
+
+		const pollTime = () => {
+			if (!player) return;
+			try {
+				const t = player.getReplayer().getCurrentTime();
+				if (t !== lastReportedMs) {
+					lastReportedMs = t;
+					onTimeUpdate?.(t);
+				}
+			} catch {
+				// Replayer may briefly be unavailable during init/destroy
+			}
+			rafId = requestAnimationFrame(pollTime);
+		};
+		rafId = requestAnimationFrame(pollTime);
 	});
 
 	onDestroy(() => {
+		if (rafId !== null) cancelAnimationFrame(rafId);
 		resizeObserver?.disconnect();
 		if (player) player.$destroy();
 	});

@@ -2,20 +2,27 @@
 	import { goto } from '$app/navigation';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
+	import * as Tabs from '$lib/components/ui/tabs';
 	import { ArrowRight } from 'lucide-svelte';
-	import type { ExceptionOccurrence, LinkedTrace } from '$lib/types/exceptions';
+	import type {
+		ExceptionOccurrence,
+		LinkedTrace,
+		SessionRecording
+	} from '$lib/types/exceptions';
 	import { formatDuration, getStatusColor, formatDateTime } from '$lib/utils/formatters';
 	import { getTimezone } from '$lib/state/timezone.svelte';
 	import { AttributesGrid } from '$lib/components/ui/attributes-grid';
 	import { LabelValue } from '../ui/label-value';
 	import { projectsState, isFrontendFramework } from '$lib/state/projects.svelte';
 	import SessionReplay from './session-replay.svelte';
+	import SessionLogsTable from './session-logs-table.svelte';
+	import SessionActionsTable from './session-actions-table.svelte';
 	import DistributedTraceCard from '$lib/components/distributed-trace/distributed-trace-card.svelte';
 
 	interface Props {
 		occurrence: ExceptionOccurrence;
 		linkedTrace: LinkedTrace | null;
-		sessionRecordingEvents?: unknown[] | null;
+		sessionRecording?: SessionRecording | null;
 		title?: string;
 		description?: string;
 		timezone?: string;
@@ -24,7 +31,7 @@
 	let {
 		occurrence,
 		linkedTrace,
-		sessionRecordingEvents = null,
+		sessionRecording = null,
 		title = 'Event',
 		description = 'Details for this specific occurrence',
 		timezone
@@ -36,18 +43,85 @@
 			? isFrontendFramework(projectsState.currentProject.framework)
 			: false
 	);
+
+	const recordingEvents = $derived(sessionRecording?.events ?? null);
+	const hasReplay = $derived(!!recordingEvents && recordingEvents.length > 0);
+	const logs = $derived(sessionRecording?.logs ?? []);
+	const actions = $derived(sessionRecording?.actions ?? []);
+	const hasLogs = $derived(logs.length > 0);
+	const hasActions = $derived(actions.length > 0);
+	// Logs/actions tables are only meaningful for frontend-framework projects.
+	// Backend / OTel exception pages must look identical to before.
+	const showSessionContext = $derived(isFrontend && (hasLogs || hasActions));
+	const defaultTab = $derived(hasLogs ? 'logs' : 'actions');
+
+	let currentTimeMs = $state(0);
+	let replayRef = $state<{ seek: (ms: number) => void } | null>(null);
+
+	function handleSeek(offsetMs: number) {
+		replayRef?.seek(offsetMs);
+	}
 </script>
 
 <!-- Session Replay -->
-{#if sessionRecordingEvents && sessionRecordingEvents.length > 0}
+{#if hasReplay}
 	<Card.Root class="pb-0">
 		<Card.Header class="gap-0">
 			<Card.Title>Session Replay</Card.Title>
 		</Card.Header>
 		<Card.Content class="p-0">
-			{#key sessionRecordingEvents}
-			<SessionReplay events={sessionRecordingEvents as any} />
-		{/key}
+			{#key recordingEvents}
+				<SessionReplay
+					bind:this={replayRef}
+					events={recordingEvents as any}
+					onTimeUpdate={(ms) => (currentTimeMs = ms)}
+				/>
+			{/key}
+		</Card.Content>
+	</Card.Root>
+{/if}
+
+<!-- Session Context (logs + actions). Frontend projects only. -->
+{#if showSessionContext}
+	<Card.Root>
+		<Card.Header>
+			<Card.Title>Session Context</Card.Title>
+			<Card.Description>
+				The last seconds of console output and recorded actions before this
+				exception. Times are offsets from the start of the recording.
+			</Card.Description>
+		</Card.Header>
+		<Card.Content>
+			<Tabs.Root value={defaultTab}>
+				<Tabs.List class="mb-4">
+					{#if hasLogs}
+						<Tabs.Trigger value="logs">Logs ({logs.length})</Tabs.Trigger>
+					{/if}
+					{#if hasActions}
+						<Tabs.Trigger value="actions">Actions ({actions.length})</Tabs.Trigger>
+					{/if}
+				</Tabs.List>
+				{#if hasLogs}
+					<Tabs.Content value="logs">
+						<SessionLogsTable
+							{logs}
+							startedAt={sessionRecording?.startedAt}
+							{currentTimeMs}
+							onSeek={handleSeek}
+						/>
+					</Tabs.Content>
+				{/if}
+				{#if hasActions}
+					<Tabs.Content value="actions">
+						<SessionActionsTable
+							{actions}
+							startedAt={sessionRecording?.startedAt}
+							{currentTimeMs}
+							onSeek={handleSeek}
+						/>
+					</Tabs.Content>
+				{/if}
+			</Tabs.Root>
 		</Card.Content>
 	</Card.Root>
 {/if}

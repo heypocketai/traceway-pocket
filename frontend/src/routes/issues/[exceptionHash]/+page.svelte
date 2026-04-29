@@ -14,7 +14,8 @@
 	import type {
 		ExceptionGroup,
 		ExceptionOccurrence,
-		LinkedTrace
+		LinkedTrace,
+		SessionRecording
 	} from '$lib/types/exceptions';
 	import { createSmartBackHandler } from '$lib/utils/back-navigation';
 	import { resolve } from '$app/paths';
@@ -26,7 +27,7 @@
 	let notFound = $state(false);
 	let total = $state(0);
 	let linkedTrace = $state<LinkedTrace | null>(null);
-	let sessionRecordingEvents = $state<unknown[] | null>(null);
+	let sessionRecording = $state<SessionRecording | null>(null);
 	let showArchiveDialog = $state(false);
 	let archiving = $state(false);
 
@@ -41,7 +42,7 @@
 		error = '';
 		notFound = false;
 		linkedTrace = null;
-		sessionRecordingEvents = null;
+		sessionRecording = null;
 
 		try {
 			const exceptionHash = page.params.exceptionHash;
@@ -59,7 +60,7 @@
 			group = response.group;
 			occurrences = response.occurrences || [];
 			total = response.pagination.total;
-			sessionRecordingEvents = response.sessionRecordingEvents ?? null;
+			sessionRecording = response.sessionRecording ?? null;
 
 			// Load linked trace if the latest occurrence has a traceId
 			const firstOccurrence = occurrences[0];
@@ -170,7 +171,7 @@
 			<EventCard
 				occurrence={latestOccurrence}
 				{linkedTrace}
-				{sessionRecordingEvents}
+				{sessionRecording}
 				title="Last Event"
 				description="Details from the most recent occurrence of this exception"
 			/>
