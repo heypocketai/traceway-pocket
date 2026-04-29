@@ -1,0 +1,113 @@
+<script lang="ts">
+	import * as Table from '$lib/components/ui/table';
+	import { TracewayTableHeader } from '$lib/components/ui/traceway-table-header';
+	import { TableEmptyState } from '$lib/components/ui/table-empty-state';
+	import type {
+		SessionActionEvent,
+		SessionNetworkEvent,
+		SessionNavigationEvent,
+		SessionCustomEvent
+	} from '$lib/types/exceptions';
+
+	interface Props {
+		actions: SessionActionEvent[];
+		startedAt?: string;
+	}
+
+	let { actions, startedAt }: Props = $props();
+
+	function formatOffset(timestamp: string): string {
+		if (!startedAt) return timestamp;
+		const start = Date.parse(startedAt);
+		const t = Date.parse(timestamp);
+		if (!Number.isFinite(start) || !Number.isFinite(t)) return timestamp;
+		const deltaMs = t - start;
+		if (Math.abs(deltaMs) >= 1000) {
+			const sign = deltaMs >= 0 ? '+' : '-';
+			return `${sign}${(Math.abs(deltaMs) / 1000).toFixed(2)}s`;
+		}
+		const sign = deltaMs >= 0 ? '+' : '-';
+		return `${sign}${Math.abs(deltaMs)}ms`;
+	}
+
+	function typeColor(type: SessionActionEvent['type']): string {
+		switch (type) {
+			case 'network':
+				return 'text-sky-600 dark:text-sky-400';
+			case 'navigation':
+				return 'text-violet-600 dark:text-violet-400';
+			case 'custom':
+				return 'text-amber-600 dark:text-amber-400';
+			default:
+				return 'text-foreground';
+		}
+	}
+
+	function summary(a: SessionActionEvent): string {
+		switch (a.type) {
+			case 'network': {
+				const n = a as SessionNetworkEvent;
+				const status = n.statusCode ?? (n.error ? 'ERR' : '?');
+				return `${n.method} ${n.url} → ${status} (${n.durationMs}ms)`;
+			}
+			case 'navigation': {
+				const n = a as SessionNavigationEvent;
+				const from = n.from ?? '?';
+				const to = n.to ?? '?';
+				return `${n.action}: ${from} → ${to}`;
+			}
+			case 'custom': {
+				const c = a as SessionCustomEvent;
+				const data = c.data ? ` ${JSON.stringify(c.data)}` : '';
+				return `${c.category}/${c.name}${data}`;
+			}
+		}
+	}
+</script>
+
+<div class="rounded-md border overflow-hidden">
+	<Table.Root>
+		{#if actions.length > 0}
+			<Table.Header>
+				<Table.Row>
+					<TracewayTableHeader
+						label="Time"
+						tooltip="Offset from the start of the session recording"
+						class="w-[110px]"
+					/>
+					<TracewayTableHeader
+						label="Type"
+						tooltip="Network / navigation / custom"
+						class="w-[110px]"
+					/>
+					<TracewayTableHeader
+						label="Details"
+						tooltip="One-line summary; full payload visible on hover"
+					/>
+				</Table.Row>
+			</Table.Header>
+		{/if}
+		<Table.Body>
+			{#if actions.length === 0}
+				<TableEmptyState colspan={3} message="No actions captured for this session." />
+			{:else}
+				{#each actions as entry}
+					<Table.Row>
+						<Table.Cell class="font-mono text-xs text-muted-foreground tabular-nums">
+							{formatOffset(entry.timestamp)}
+						</Table.Cell>
+						<Table.Cell class="font-mono text-xs uppercase {typeColor(entry.type)}">
+							{entry.type}
+						</Table.Cell>
+						<Table.Cell
+							class="font-mono text-xs truncate max-w-[600px]"
+							title={summary(entry)}
+						>
+							{summary(entry)}
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			{/if}
+		</Table.Body>
+	</Table.Root>
+</div>

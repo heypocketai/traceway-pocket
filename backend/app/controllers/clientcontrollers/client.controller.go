@@ -1,10 +1,12 @@
 package clientcontrollers
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -27,6 +29,19 @@ import (
 )
 
 type clientController struct{}
+
+// isEmptyRaw reports whether a json.RawMessage carries no meaningful payload —
+// nil, blank, `null`, `[]`, or `{}` all count as empty. Used to drop session
+// recordings that would otherwise just be wasted S3 writes.
+func isEmptyRaw(r json.RawMessage) bool {
+	if len(r) == 0 {
+		return true
+	}
+	trimmed := bytes.TrimSpace(r)
+	return bytes.Equal(trimmed, []byte("null")) ||
+		bytes.Equal(trimmed, []byte("[]")) ||
+		bytes.Equal(trimmed, []byte("{}"))
+}
 
 type ReportRequest struct {
 	CollectionFrames []*clientmodels.CollectionFrame `json:"collectionFrames"`
@@ -72,8 +87,12 @@ func (e clientController) Report(c *gin.Context) {
 		Id          uuid.UUID
 		ProjectId   uuid.UUID
 		ExceptionId uuid.UUID
-		Events      []byte
-		RecordedAt  time.Time
+		// Body is the marshaled JSON of the entire ClientSessionRecording
+		// sub-document — events + logs + actions + startedAt/endedAt — exactly
+		// as it lands in S3. App console logs in `logs` are intentionally not
+		// inserted into the OTel logs ClickHouse table; they live only here.
+		Body       []byte
+		RecordedAt time.Time
 	}
 	var recordingsWork []recordingWork
 
@@ -153,11 +172,22 @@ func (e clientController) Report(c *gin.Context) {
 			if !ok {
 				continue
 			}
+			// Skip recordings that carry no payload at all. The SDK shouldn't
+			// be sending these, but be defensive — an empty recording would
+			// just be a wasted S3 write and an empty session_recordings row.
+			if isEmptyRaw(sr.Events) && isEmptyRaw(sr.Logs) && isEmptyRaw(sr.Actions) {
+				continue
+			}
+			body, err := json.Marshal(sr)
+			if err != nil {
+				traceway.CaptureException(traceway.NewStackTraceErrorf("failed to marshal session recording: %w", err))
+				continue
+			}
 			recordingsWork = append(recordingsWork, recordingWork{
 				Id:          uuid.New(),
 				ProjectId:   projectId,
 				ExceptionId: exceptionId,
-				Events:      sr.Events,
+				Body:        body,
 				RecordedAt:  time.Now().UTC(),
 			})
 		}
@@ -247,7 +277,7 @@ func (e clientController) Report(c *gin.Context) {
 			var successful []models.SessionRecording
 			for _, rw := range work {
 				key := fmt.Sprintf("recordings/%s/%s.json", rw.ProjectId, rw.ExceptionId)
-				if err := storage.Store.Write(context.Background(), key, rw.Events); err != nil {
+				if err := storage.Store.Write(context.Background(), key, rw.Body); err != nil {
 					traceway.CaptureException(traceway.NewStackTraceErrorf("failed to write session recording (key=%s): %w", key, err))
 					continue
 				}
