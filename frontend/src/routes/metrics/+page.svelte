@@ -36,6 +36,7 @@
 		widgetType: string;
 		config: any;
 		position: number;
+		isStarred?: boolean;
 	};
 
 	type WidgetGroup = {
@@ -356,6 +357,24 @@
 		}
 	}
 
+	async function handleToggleStar(widget: { id: number; isStarred?: boolean }) {
+		if (!activeGroup) return;
+		const target = activeGroup.widgets?.find((w) => w.id === widget.id);
+		if (!target) return;
+		const previous = target.isStarred ?? false;
+		target.isStarred = !previous;
+		try {
+			await api.put(
+				`/widget-groups/${activeGroup.id}/widgets/${widget.id}/star`,
+				{},
+				{ projectId: projectsState.currentProjectId ?? undefined }
+			);
+		} catch (e: any) {
+			target.isStarred = previous;
+			toast.error(e?.message || 'Failed to update star', { position: 'top-center' });
+		}
+	}
+
 	async function handleMoveWidget(widgetId: number, offset: number) {
 		if (!activeGroup) return;
 		try {
@@ -570,6 +589,7 @@
 							onDeleteWidget={openDeleteWidgetDialog}
 							onMoveWidget={handleMoveWidget}
 							onAddWidget={openAddWidget}
+							onToggleStar={handleToggleStar}
 							onRangeSelect={handleChartRangeSelect}
 						/>
 					{/if}

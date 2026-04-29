@@ -15,8 +15,11 @@
 		RefreshCw,
 		Copy,
 		Check,
+		Star,
 		Unplug
 	} from 'lucide-svelte';
+	import * as Card from '$lib/components/ui/card';
+	import WidgetRenderer from '$lib/components/dashboard/widget-renderer.svelte';
 	import { TracewayTableHeader } from '$lib/components/ui/traceway-table-header';
 	import { ImpactBadge } from '$lib/components/ui/impact-badge';
 	import { ViewAllTableRow } from '$lib/components/ui/view-all-table-row';
@@ -88,10 +91,24 @@
 		hasData: boolean;
 	};
 
+	type StarredWidget = {
+		id: number;
+		widgetGroupId: number;
+		title: string;
+		widgetType: string;
+		config: any;
+		isStarred: boolean;
+	};
+
 	let data = $state<DashboardOverview | null>(null);
+	let starredWidgets = $state<StarredWidget[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 	let errorStatus = $state<number>(0);
+
+	const STARRED_WINDOW_MS = 24 * 60 * 60 * 1000;
+	let starredFromUTC = $state(new Date(Date.now() - STARRED_WINDOW_MS).toISOString());
+	let starredToUTC = $state(new Date().toISOString());
 
 	// Filter endpoints to only show those with impact > good (score >= 0.25)
 	const impactfulEndpoints = $derived(data?.worstEndpoints?.filter((e) => e.impact >= 0.25) ?? []);
@@ -293,10 +310,15 @@ service:
 		errorStatus = 0;
 
 		try {
-			const response = await api.get('/dashboard/overview', {
-				projectId: projectsState.currentProjectId ?? undefined
-			});
-			data = response;
+			const projectId = projectsState.currentProjectId ?? undefined;
+			starredFromUTC = new Date(Date.now() - STARRED_WINDOW_MS).toISOString();
+			starredToUTC = new Date().toISOString();
+			const [overview, starred] = await Promise.all([
+				api.get('/dashboard/overview', { projectId }),
+				api.get('/widget-groups/starred', { projectId }).catch(() => [])
+			]);
+			data = overview;
+			starredWidgets = (starred as StarredWidget[]) ?? [];
 		} catch (e: any) {
 			errorStatus = e.status || 0;
 			error = e.message || 'Failed to load dashboard data';
@@ -812,6 +834,47 @@ service:
 		</div>
 	{:else if !error}
 		<div class="space-y-6">
+			{#if starredWidgets.length > 0}
+				<div>
+					<div class="items-bottom mb-4 flex gap-1">
+						<div class="mr-2 flex h-8 w-8 items-center justify-center rounded-md bg-yellow-500/10">
+							<Star class="h-5 w-5 fill-yellow-500 text-yellow-500" />
+						</div>
+						<h2 class="text-2xl font-bold tracking-tight">Starred</h2>
+						<Tooltip.Root>
+							<Tooltip.Trigger class="pt-1">
+								<CircleQuestionMark class="h-4 w-4 text-muted-foreground/60" />
+							</Tooltip.Trigger>
+							<Tooltip.Content>
+								<p>Widgets you've starred from the Metrics page (last 24h)</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
+					</div>
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+						{#each starredWidgets as widget (widget.id)}
+							<Card.Root class="h-full gap-0">
+								<Card.Header class="pr-2 pb-1">
+									<Card.Title class="text-sm font-medium"
+										>{widget.title}{#if widget.config?.unit}<span
+												class="text-xs font-normal text-muted-foreground"
+											>
+												({widget.config.unit})</span
+											>{/if}</Card.Title
+									>
+								</Card.Header>
+								<Card.Content class="p-1">
+									<WidgetRenderer
+										{widget}
+										fromDateUTC={starredFromUTC}
+										toDateUTC={starredToUTC}
+										timeDomain={null}
+									/>
+								</Card.Content>
+							</Card.Root>
+						{/each}
+					</div>
+				</div>
+			{/if}
 			{#if !isFrontend}
 				<!-- Endpoints -->
 				<div>

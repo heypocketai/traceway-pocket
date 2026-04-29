@@ -314,6 +314,82 @@ func (c *widgetController) Delete(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"deleted": true})
 }
 
+func (c *widgetController) ToggleStar(ctx *gin.Context) {
+	projectId, err := middleware.GetProjectId(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
+		return
+	}
+
+	groupIdStr := ctx.Param("id")
+	groupId, err := strconv.Atoi(groupIdStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid widget group id"})
+		return
+	}
+
+	widgetIdStr := ctx.Param("wid")
+	widgetId, err := strconv.Atoi(widgetIdStr)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid widget id"})
+		return
+	}
+
+	tx := middleware.GetTx(ctx)
+
+	group, err := repositories.WidgetGroupRepository.FindById(tx, groupId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to toggle star: %w", err))
+		return
+	}
+	if group == nil || group.ProjectId != projectId {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Widget group not found"})
+		return
+	}
+
+	widget, err := repositories.WidgetGroupRepository.FindWidgetById(tx, widgetId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to toggle star: %w", err))
+		return
+	}
+	if widget == nil || widget.WidgetGroupId != groupId {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Widget not found"})
+		return
+	}
+
+	widget.IsStarred = !widget.IsStarred
+	widget.UpdatedAt = time.Now().UTC()
+
+	if err := repositories.WidgetGroupRepository.UpdateWidget(tx, widget); err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to toggle star: %w", err))
+		return
+	}
+
+	ctx.JSON(http.StatusOK, widget)
+}
+
+func (c *widgetController) ListStarred(ctx *gin.Context) {
+	projectId, err := middleware.GetProjectId(ctx)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
+		return
+	}
+
+	tx := middleware.GetTx(ctx)
+
+	widgets, err := repositories.WidgetGroupRepository.FindStarredWidgetsByProject(tx, projectId)
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list starred widgets: %w", err))
+		return
+	}
+
+	if widgets == nil {
+		widgets = []*models.WidgetGroupWidget{}
+	}
+
+	ctx.JSON(http.StatusOK, widgets)
+}
+
 func validateWidgetConfig(raw json.RawMessage) string {
 	var cfg struct {
 		Sources []struct {

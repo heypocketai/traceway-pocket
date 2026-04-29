@@ -62,6 +62,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.GET("/widget-groups", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, WidgetGroupController.List)
 	router.POST("/widget-groups", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Create)
 	router.POST("/widget-groups/populate-defaults", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.PopulateDefaults)
+	router.GET("/widget-groups/starred", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, WidgetController.ListStarred)
 	router.GET("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.Transactional, WidgetGroupController.GetWithWidgets)
 	router.PUT("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Update)
 	router.DELETE("/widget-groups/:id", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetGroupController.Delete)
@@ -70,6 +71,7 @@ func RegisterControllers(router *gin.RouterGroup) {
 	router.POST("/widget-groups/:id/widgets", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.Add)
 	router.PUT("/widget-groups/:id/widgets/:wid", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.Update)
 	router.PUT("/widget-groups/:id/widgets/:wid/move", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.Move)
+	router.PUT("/widget-groups/:id/widgets/:wid/star", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.ToggleStar)
 	router.DELETE("/widget-groups/:id/widgets/:wid", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, WidgetController.Delete)
 
 	// Endpoints (projectId in body)

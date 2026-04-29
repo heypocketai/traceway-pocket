@@ -25,6 +25,7 @@ type WidgetGroupWidget struct {
 	WidgetType    string          `json:"widgetType" lit:"widget_type"`
 	Config        json.RawMessage `json:"config" lit:"config"`
 	Position      int             `json:"position" lit:"position"`
+	IsStarred     bool            `json:"isStarred" lit:"is_starred"`
 	CreatedAt     time.Time       `json:"createdAt" lit:"created_at"`
 	UpdatedAt     time.Time       `json:"updatedAt" lit:"updated_at"`
 }

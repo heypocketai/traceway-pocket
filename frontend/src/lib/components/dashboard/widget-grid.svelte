@@ -10,6 +10,7 @@
 		ArrowDown,
 		ArrowLeft,
 		ArrowRight,
+		Star,
 		Trash2
 	} from 'lucide-svelte';
 	import WidgetRenderer from './widget-renderer.svelte';
@@ -20,6 +21,7 @@
 		widgetType: string;
 		config: any;
 		position: number;
+		isStarred?: boolean;
 	};
 
 	let {
@@ -31,6 +33,7 @@
 		onDeleteWidget,
 		onMoveWidget,
 		onAddWidget,
+		onToggleStar,
 		onRangeSelect
 	} = $props<{
 		widgets: Widget[];
@@ -41,6 +44,7 @@
 		onDeleteWidget?: (widget: Widget) => void;
 		onMoveWidget?: (widgetId: number, offset: number) => void;
 		onAddWidget?: () => void;
+		onToggleStar?: (widget: Widget) => void;
 		onRangeSelect?: (from: Date, to: Date) => void;
 	}>();
 
@@ -67,7 +71,17 @@
 				<Card.Header class="pr-2 pb-1">
 					<div class="flex items-center justify-between">
 						<Card.Title class="text-sm font-medium">{widget.title}{#if widget.config?.unit}<span class="text-xs font-normal text-muted-foreground"> ({widget.config.unit})</span>{/if}</Card.Title>
-						<DropdownMenu.Root>
+						<div class="flex items-center">
+							<button
+								type="button"
+								aria-label={widget.isStarred ? 'Unstar widget' : 'Star widget'}
+								title={widget.isStarred ? 'Unstar' : 'Star'}
+								class="inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-muted {widget.isStarred ? 'text-yellow-500 hover:text-yellow-600' : 'text-muted-foreground hover:text-foreground'}"
+								onclick={() => onToggleStar?.(widget)}
+							>
+								<Star class="h-4 w-4 {widget.isStarred ? 'fill-current' : ''}" />
+							</button>
+							<DropdownMenu.Root>
 							<DropdownMenu.Trigger
 								class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 							>
@@ -126,6 +140,7 @@
 								</DropdownMenu.Item>
 							</DropdownMenu.Content>
 						</DropdownMenu.Root>
+						</div>
 					</div>
 				</Card.Header>
 				<Card.Content class="p-1">
