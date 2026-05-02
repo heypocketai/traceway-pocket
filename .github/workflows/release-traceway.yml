@@ -1,0 +1,91 @@
+name: Release Traceway
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (X.Y.Z, no leading v)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        run: |
+          if ! [[ "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Error: version must be in X.Y.Z format (got '${{ inputs.version }}')"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check tag does not already exist
+        run: |
+          TAG="backend/v${{ inputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Error: tag $TAG already exists"
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "latest"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump frontend version
+        working-directory: frontend
+        run: npm version "${{ inputs.version }}" --no-git-tag-version
+
+      - name: Commit version bump
+        run: |
+          git add frontend/package.json frontend/package-lock.json
+          git commit -m "v to ${{ inputs.version }}"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Bundle frontend into backend
+        run: |
+          rm -rf backend/static/frontend
+          mkdir -p backend/static/frontend
+          cp -r frontend/build/. backend/static/frontend/
+
+      - name: Commit release
+        run: |
+          git add backend/static/frontend/
+          git add -A backend/
+          git commit -m "release: backend v${{ inputs.version }}"
+
+      - name: Tag release
+        run: git tag "backend/v${{ inputs.version }}"
+
+      - name: Push branch and tag
+        run: |
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "backend/v${{ inputs.version }}"
+
+      - name: Summary
+        run: |
+          echo "Released backend/v${{ inputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Users can now: \`go get github.com/tracewayapp/traceway/backend@v${{ inputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
