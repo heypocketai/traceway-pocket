@@ -271,16 +271,93 @@ export default function FlutterSessionReplayPage() {
               No frame drops. <em>No battery spike.</em>
             </>
           }
-          description="Benchmarked on Pixel 5, Pixel 6, and Pixel 8 via Firebase Test Lab. Full harness open source — run it yourself on your own device tier. Tail latency numbers included because p50 is where bugs hide."
+          description="Benchmarked on Pixel 5/6/8 and iPhone 8/14 Pro/16 Pro via Firebase Test Lab — 10 workloads × 4 SDK configs per device. Full harness open source; re-run it on your own tier. Tail latencies included because p50 is where bugs hide."
         />
         <StatsStrip
           stats={[
-            { num: "<em>0%</em>", label: "Frame-time regression — p50, p95, p99" },
-            { num: "<em>5–12</em>MB", label: "Steady-state RAM footprint" },
-            { num: "<em>15</em> FPS", label: "Default capture rate (tunable)" },
-            { num: "<em>~250</em>KB", label: "per 10-second recording" },
+            { num: "<em>+0</em>MB", label: "Memory overhead when idle (loaded, not recording)" },
+            { num: "<em>+16</em>MB", label: "Median RAM during active screen capture" },
+            { num: "<em>&lt;1</em>ms", label: "Exception capture latency on iOS" },
+            { num: "<em>0%</em>", label: "Steady-state wall-clock impact" },
           ]}
         />
+        <div className="mt-12 grid gap-6 md:grid-cols-2 max-w-4xl mx-auto">
+          <div
+            className="rounded-xl px-6 py-6"
+            style={{
+              background: "var(--ink-3)",
+              border: "1px solid var(--hair-2)",
+            }}
+          >
+            <Eyebrow>What we guarantee</Eyebrow>
+            <ul
+              className="mt-4 space-y-3 text-[14px]"
+              style={{ color: "var(--fg-2)" }}
+            >
+              <li>
+                <strong style={{ color: "var(--fg-1)" }}>Idle is free.</strong>{" "}
+                With <code>screenCapture: false</code> or before the first
+                recording, RSS overhead stays under 10&nbsp;MB on every tested
+                device — typically zero.
+              </li>
+              <li>
+                <strong style={{ color: "var(--fg-1)" }}>Active recording stays small.</strong>{" "}
+                Median memory overhead during capture is under 20&nbsp;MB; the
+                worst measured case across all devices held below 80&nbsp;MB
+                even under bursty video + exception workloads.
+              </li>
+              <li>
+                <strong style={{ color: "var(--fg-1)" }}>Exception capture beats a frame.</strong>{" "}
+                Sub-millisecond on iOS, under 15&nbsp;ms on Android — both fit
+                inside a single 60 Hz frame (16.7&nbsp;ms), so capturing an
+                exception cannot drop a frame in steady state.
+              </li>
+              <li>
+                <strong style={{ color: "var(--fg-1)" }}>Disk persistence is free.</strong>{" "}
+                Writing recordings to disk consumes the same RAM as in-memory
+                only — no extra cost for offline-safe shipping.
+              </li>
+            </ul>
+          </div>
+          <div
+            className="rounded-xl px-6 py-6"
+            style={{
+              background: "var(--ink-3)",
+              border: "1px solid var(--hair-2)",
+            }}
+          >
+            <Eyebrow>The fine print</Eyebrow>
+            <ul
+              className="mt-4 space-y-3 text-[14px]"
+              style={{ color: "var(--fg-3)" }}
+            >
+              <li>
+                Numbers come from a single GitHub Actions run on Firebase Test
+                Lab hardware — methodology and raw data live in the SDK repo.
+              </li>
+              <li>
+                Frame-timing carries enough variance per scenario that we don&rsquo;t
+                claim improvements; we claim &quot;no measurable regression on any
+                tested workload&quot;.
+              </li>
+              <li>
+                Worst-case memory peaks come from synthetic burst tests (5
+                exceptions per second during video playback). Apps that throw
+                1–2 exceptions per session sit at the median.
+              </li>
+              <li>
+                Run the benchmark yourself with{" "}
+                <Link
+                  href="https://github.com/tracewayapp/traceway-flutter/blob/main/.github/workflows/benchmark.yml"
+                  className="underline decoration-dotted underline-offset-4 hover:text-[color:var(--a2)]"
+                >
+                  Performance Benchmarks
+                </Link>{" "}
+                on your fork.
+              </li>
+            </ul>
+          </div>
+        </div>
       </section>
 
       {/* 7. TRUST ROW */}
