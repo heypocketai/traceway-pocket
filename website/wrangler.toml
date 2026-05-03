@@ -11,6 +11,9 @@ SENDGRID_FROM_EMAIL = "dusan@tracewayapp.com"
 SENDGRID_TO_EMAIL = "dusan@tracewayapp.com"
 NEXT_PUBLIC_CALENDLY_URL = "https://calendly.com/dusan-tracewayapp/30min?back=1&month=2026-04"
 
+[observability]
+enabled = true
+
 [observability.traces]
 enabled = true
 head_sampling_rate = 1
