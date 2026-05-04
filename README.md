@@ -139,6 +139,8 @@ Traceway integrates with the tools you already use. Every integration ships trac
 <tbody>
 <tr>
 <td align="center" width="150"><a href="https://docs.tracewayapp.com/client/flutter"><img src="./docs/public/flutter.png" height="28" alt="Flutter" /><br/><b>Flutter</b></a></td>
+<td align="center" width="150"><a href="https://docs.tracewayapp.com/client/android"><img src="./docs/public/android.png" height="28" alt="Android" /><br/><b>Android</b></a></td>
+<td align="center" width="150"><a href="https://docs.tracewayapp.com/client/react-native"><img src="./docs/public/react.png" height="28" alt="React Native" /><br/><b>React Native</b></a></td>
 </tr>
 </tbody>
 </table>
