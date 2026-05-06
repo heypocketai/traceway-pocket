@@ -41,7 +41,7 @@
 						'data-[side=top]:border-r data-[side=top]:border-b',
 						'data-[side=bottom]:border-t data-[side=bottom]:border-l',
 						'data-[side=left]:border-r data-[side=left]:border-b',
-						'data-[side=right]:border-t data-[side=right]:border-l',
+						'data-[side=right]:border-r data-[side=right]:border-b',
 						'data-[side=top]:translate-x-1/2 data-[side=top]:translate-y-[calc(-50%_+_3px)]',
 						'data-[side=bottom]:-translate-x-1/2 data-[side=bottom]:-translate-y-[calc(50%_-_2px)] data-[side=bottom]:rotate-225',
 						'data-[side=right]:translate-x-[calc(50%_+_2px)] data-[side=right]:translate-y-1/2',
