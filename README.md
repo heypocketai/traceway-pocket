@@ -24,7 +24,7 @@
 
 ---
 
-Traceway is an **OpenTelemetry-native** observability platform that stitches **logs, traces, metrics, session replay, exceptions, and AI tracing** together with one trace ID. Point an OTLP exporter at it and you're in business — no Collector, no glue code, no per-language vendor SDK.
+Traceway is an **OpenTelemetry-native** observability platform that combines **logs, traces, metrics, session replay/RUM, exceptions, and AI tracing** together. Point an OTLP exporter at it and you're in business. No Collector, no glue code, no per-language vendor SDK.
 
 **MIT licensed. No BSL. No "open core."** Every feature is in the box. Self-host it for free, or run it on [Traceway Cloud](https://cloud.tracewayapp.com) if you'd rather not babysit infra.
 
