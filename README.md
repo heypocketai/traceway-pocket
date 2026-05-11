@@ -16,10 +16,11 @@
   <a href="https://opentelemetry.io"><img alt="OTel-First" src="https://img.shields.io/badge/OTel--First-Native%20OTLP%2FHTTP-425CC7?logo=opentelemetry&logoColor=white" /></a>
   <a href="https://github.com/tracewayapp/traceway/blob/main/LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/100%25%20Open%20Source-MIT-22c55e" /></a>
   <a href="https://docs.tracewayapp.com/server/docker-compose"><img alt="Self-Host" src="https://img.shields.io/badge/Self--Host-docker%20compose%20up-2496ed?logo=docker&logoColor=white" /></a>
+  <a href="https://discord.gg/9tPn2SB3"><img alt="Join us on Discord" src="https://img.shields.io/badge/Discord-Join%20the%20community-5865F2?logo=discord&logoColor=white" /></a>
 </p>
 
 <p align="center">
-  <a href="https://tracewayapp.com">Website</a> · <a href="https://docs.tracewayapp.com">Docs</a> · <a href="https://cloud.tracewayapp.com">Cloud</a>
+  <a href="https://tracewayapp.com">Website</a> · <a href="https://docs.tracewayapp.com">Docs</a> · <a href="https://cloud.tracewayapp.com">Cloud</a> · <a href="https://discord.gg/9tPn2SB3">Discord</a>
 </p>
 
 ---
@@ -29,6 +30,11 @@ Traceway is an **OpenTelemetry-native** observability platform that combines **l
 **MIT licensed. No BSL. No "open core."** Every feature is in the box. Self-host it for free, or run it on [Traceway Cloud](https://cloud.tracewayapp.com) if you'd rather not babysit infra.
 
 <img alt="Traceway Dashboard" src="./website/public/images/performance-endpoints-impact-table.png" />
+
+<p align="center">
+  <a href="https://discord.gg/9tPn2SB3"><b>👋 Join the Traceway Community on Discord →</b></a><br>
+  <sub>Chat with the team, shape the roadmap, get help, and meet other folks running Traceway in production.</sub>
+</p>
 
 ## What's in the box
 
@@ -229,12 +235,27 @@ Full documentation at **[docs.tracewayapp.com](https://docs.tracewayapp.com)**:
 - [**Concepts**](https://docs.tracewayapp.com/learn) — How tracing, exception grouping, metrics, and alerts work
 - [**Embedded Mode**](https://docs.tracewayapp.com/learn/embedded-mode) — Run Traceway inside your Go app
 
+## Community
+
+Traceway is built in the open, and the **[Discord community](https://discord.gg/9tPn2SB3)** is where it happens. Come say hi — whether you're kicking the tires, running it in production, or just curious. We use it to:
+
+- 🗣️ **Talk through ideas** — feature requests, integration asks, roadmap input
+- 🛟 **Help each other out** — setup, OTel wiring, deployment questions
+- 🚀 **Show & tell** — share what you're building and how you're using Traceway
+- 🐛 **Catch bugs early** — report issues and get fast feedback from maintainers
+- 👀 **Get the inside scoop** — sneak peeks at what's shipping next
+
+<p>
+  <a href="https://discord.gg/9tPn2SB3"><img alt="Join the Traceway Community on Discord" src="https://img.shields.io/badge/Join%20the%20Community-on%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" /></a>
+</p>
+
 ## Contribute
 
-Contributions are welcome — pull requests get reviewed and merged. If you're not sure where to start or want to discuss an idea first, [open an issue](https://github.com/tracewayapp/traceway/issues) and we'll talk it through.
+Contributions are welcome — pull requests get reviewed and merged. If you're not sure where to start or want to discuss an idea first, [open an issue](https://github.com/tracewayapp/traceway/issues) or drop by the [community Discord](https://discord.gg/9tPn2SB3) and we'll talk it through.
 
 ## Links
 
 - [Website](https://tracewayapp.com)
 - [Documentation](https://docs.tracewayapp.com)
 - [Traceway Cloud](https://cloud.tracewayapp.com) — managed hosting (same MIT code, run by us)
+- [Community Discord](https://discord.gg/9tPn2SB3) — chat with the team and other users
