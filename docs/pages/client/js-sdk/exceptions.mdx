@@ -86,4 +86,4 @@ For best stack traces, always throw and catch actual `Error` objects.
 
 ## React Error Boundaries
 
-For React applications, use the `@tracewayapp/react` package which provides a `TracewayErrorBoundary` component that automatically captures React component errors. See the [React documentation](/client/react/error-boundary) for details.
+For React applications, use the `@tracewayapp/react` package. Its `<TracewayProvider>` itself acts as an error boundary — render-time exceptions are captured automatically and re-thrown so the app behaves exactly as without Traceway. See the [React documentation](/client/react) for setup, or the [Error Boundary page](/client/react/error-boundary) if you need a custom fallback UI for a specific subtree.

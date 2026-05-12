@@ -21,7 +21,7 @@ export function getInstallCommand(framework: Framework): string {
 		case 'vuejs':
 			return 'npm install @tracewayapp/vue';
 		case 'nextjs':
-			return 'npm install @tracewayapp/next';
+			return 'npm install @tracewayapp/react';
 		case 'nestjs':
 			return 'npm install @tracewayapp/nest';
 		case 'express':
@@ -153,12 +153,16 @@ function App() {
 export default App;`;
 
 		case 'svelte':
-			return `<script>
+			return `<!-- src/routes/+layout.svelte -->
+<script>
   import { setupTraceway } from "@tracewayapp/svelte";
+  import { browser } from "$app/environment";
 
-  setupTraceway({
-    connectionString: "${connectionString}",
-  });
+  if (browser) {
+    setupTraceway({
+      connectionString: "${connectionString}",
+    });
+  }
 </script>
 
 <slot />`;
@@ -177,11 +181,31 @@ app.use(createTracewayPlugin({
 app.mount("#app");`;
 
 		case 'nextjs':
-			return `import { withTraceway } from "@tracewayapp/next";
+			return `// app/traceway-provider.tsx
+"use client";
 
-export default withTraceway({
-    connectionString: "${connectionString}",
-});`;
+import { TracewayProvider } from "@tracewayapp/react";
+
+export function TracewayClientProvider({ children }: { children: React.ReactNode }) {
+  return (
+    <TracewayProvider connectionString="${connectionString}">
+      {children}
+    </TracewayProvider>
+  );
+}
+
+// app/layout.tsx
+import { TracewayClientProvider } from "./traceway-provider";
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <TracewayClientProvider>{children}</TracewayClientProvider>
+      </body>
+    </html>
+  );
+}`;
 
 		case 'nestjs':
 			return `import { Module } from "@nestjs/common";
@@ -225,17 +249,12 @@ init("${connectionString}");
 // Distributed trace headers are injected into $.ajax() requests`;
 
 		case 'react-native':
-			return `import { TracewayProvider, TracewayErrorBoundary } from "@tracewayapp/react-native";
+			return `import { TracewayProvider } from "@tracewayapp/react-native";
 
 export default function App() {
   return (
-    <TracewayProvider
-      connectionString="${connectionString}"
-      options={{ version: "1.0.0" }}
-    >
-      <TracewayErrorBoundary fallback={<CrashScreen />}>
-        <RootNavigator />
-      </TracewayErrorBoundary>
+    <TracewayProvider connectionString="${connectionString}">
+      <RootNavigator />
     </TracewayProvider>
   );
 }`;
@@ -432,6 +451,13 @@ captureException(new Error("Test error"));`;
 			case 'jquery':
 				return `import { captureException } from "@tracewayapp/jquery";
 
+captureException(new Error("Test error"));`;
+			case 'nextjs':
+				return `import { useTraceway } from "@tracewayapp/react";
+
+// In a client component
+"use client";
+const { captureException } = useTraceway();
 captureException(new Error("Test error"));`;
 			case 'react-native':
 				return `import { useTraceway } from "@tracewayapp/react-native";

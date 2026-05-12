@@ -10,26 +10,21 @@ npm install @tracewayapp/react-native
 
 ## Setup
 
-Wrap your app in `TracewayProvider` from your entry component (typically `App.tsx`). Mounting the provider runs `init(...)` once, which installs RN's `ErrorUtils` global handler, the `fetch` / `XMLHttpRequest` wrappers, and the `console.*` mirror:
+Wrap your app in `TracewayProvider` from your entry component (typically `App.tsx`). Mounting the provider runs `init(...)` once, which installs RN's `ErrorUtils` global handler, the `fetch` / `XMLHttpRequest` wrappers, and the `console.*` mirror. The provider also catches render-time errors anywhere below it and reports them automatically — no separate error boundary needed:
 
 ```tsx
-import { TracewayProvider, TracewayErrorBoundary } from "@tracewayapp/react-native";
+import { TracewayProvider } from "@tracewayapp/react-native";
 
 export default function App() {
   return (
-    <TracewayProvider
-      connectionString="your-token@https://traceway.example.com/api/report"
-      options={{ version: "1.0.0" }}
-    >
-      <TracewayErrorBoundary fallback={<CrashScreen />}>
-        <RootNavigator />
-      </TracewayErrorBoundary>
+    <TracewayProvider connectionString="your-token@https://traceway.example.com/api/report">
+      <RootNavigator />
     </TracewayProvider>
   );
 }
 ```
 
-That's it. Every uncaught throw, unhandled promise rejection, render-time error inside `<TracewayErrorBoundary>`, and `fetch` call is captured automatically.
+That's it. Every uncaught throw, unhandled promise rejection, render-time exception, and `fetch` call is captured automatically. If you want to replace a crashed subtree with a custom fallback view, `TracewayErrorBoundary` is still exported for that purpose.
 
 > **No screen recording.** Unlike the browser SDK ([`@tracewayapp/frontend`](/client/js-sdk?sdk=js-generic)), this package does not record the screen. The `rrweb` recorder is intentionally absent — nothing in the bundle reaches into a DOM that doesn't exist.
 
@@ -255,7 +250,7 @@ For each captured exception: `device info < global scope < per-call`.
 
 - **Uncaught throws** on the JS thread via `ErrorUtils.setGlobalHandler` — RN's equivalent of `window.onerror`. The red-box dev overlay still appears; we forward to the previous handler.
 - **Unhandled promise rejections** — `Promise.reject(...)` without a `.catch()` reaches the same `ErrorUtils` handler.
-- **Render errors** — when wrapped in `<TracewayErrorBoundary>`, exceptions thrown during render or in lifecycle methods are captured.
+- **Render errors** — `<TracewayProvider>` itself acts as an error boundary: exceptions thrown during render or in lifecycle methods are captured and re-thrown so your app behaves exactly as without Traceway.
 - **`fetch` calls** — wrapped at `init()`, recorded with method, URL, status, duration, byte counts.
 - **`XMLHttpRequest` calls** — RN polyfills XHR (and `fetch` is implemented on top of it on some platforms); both paths are covered.
 - **Console output** — `console.{debug,log,info,warn,error}` is mirrored into the log buffer that rides along the next exception.

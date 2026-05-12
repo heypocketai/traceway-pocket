@@ -10,19 +10,25 @@ npm install @tracewayapp/svelte
 
 ## Setup
 
-Call `setupTraceway` in your root component (e.g., `+layout.svelte` for SvelteKit):
+Call `setupTraceway` in your root layout. The `if (browser)` guard keeps the rrweb recorder out of the SSR bundle. Session recording is on by default — the last ~30s of DOM events ship with every captured exception:
 
 ```svelte
+<!-- src/routes/+layout.svelte -->
 <script>
   import { setupTraceway } from "@tracewayapp/svelte";
+  import { browser } from "$app/environment";
 
-  setupTraceway({
-    connectionString: "your-token@https://traceway.example.com/api/report",
-  });
+  if (browser) {
+    setupTraceway({
+      connectionString: "your-token@https://traceway.example.com/api/report",
+    });
+  }
 </script>
 
 <slot />
 ```
+
+For a non-SvelteKit Svelte app, drop the `if (browser)` guard and import nothing from `$app/environment`.
 
 ## Capture Errors in Components
 
@@ -81,27 +87,6 @@ Use `getTraceway` in child components:
 ```
 
 Click the button and check your Traceway dashboard to verify the error appears.
-
-## SvelteKit Setup
-
-For SvelteKit, set up Traceway in your root layout:
-
-```svelte
-<!-- src/routes/+layout.svelte -->
-<script>
-  import { setupTraceway } from "@tracewayapp/svelte";
-  import { browser } from "$app/environment";
-
-  // Only initialize on client
-  if (browser) {
-    setupTraceway({
-      connectionString: "your-token@https://traceway.example.com/api/report",
-    });
-  }
-</script>
-
-<slot />
-```
 
 ## Distributed Tracing
 
