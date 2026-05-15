@@ -1,0 +1,234 @@
+{
+  "tier": "ccx13",
+  "mode": "pgch",
+  "startedAt": "2026-05-15T00:34:30Z",
+  "endedAt": "2026-05-15T01:04:30Z",
+  "maxSustainableEps": 399.9148312208899,
+  "steps": [
+    {
+      "step": 1,
+      "targetEps": 100,
+      "actualEps": 100.83232297413093,
+      "ingest": {
+        "p50": 42.629253,
+        "p95": 75.962644,
+        "p99": 97.83828899999999,
+        "ok": 1210,
+        "errors": 0,
+        "errRate": 0
+      },
+      "reads": {
+        "dashboard_overview": {
+          "p50": 88.39098,
+          "p95": 121.13788100000001,
+          "p99": 211.754699,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        },
+        "endpoints_grouped": {
+          "p50": 80.823104,
+          "p95": 101.530595,
+          "p99": 113.757081,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        },
+        "exceptions_grouped": {
+          "p50": 66.645185,
+          "p95": 90.47883399999999,
+          "p99": 95.677572,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        },
+        "logs": {
+          "p50": 20.796757999999997,
+          "p95": 34.253062,
+          "p99": 49.886695,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        },
+        "session_recording": {
+          "p50": 26.795164,
+          "p95": 47.087915,
+          "p99": 50.069425,
+          "ok": 119,
+          "errors": 0,
+          "errRate": 0
+        }
+      },
+      "passed": true
+    },
+    {
+      "step": 2,
+      "targetEps": 200,
+      "actualEps": 199.9996855588277,
+      "ingest": {
+        "p50": 28.794909,
+        "p95": 77.61583,
+        "p99": 114.233834,
+        "ok": 2400,
+        "errors": 0,
+        "errRate": 0
+      },
+      "reads": {
+        "dashboard_overview": {
+          "p50": 112.926181,
+          "p95": 182.417328,
+          "p99": 198.89278199999998,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "endpoints_grouped": {
+          "p50": 96.453647,
+          "p95": 175.537019,
+          "p99": 181.106161,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "exceptions_grouped": {
+          "p50": 52.890036,
+          "p95": 88.470487,
+          "p99": 91.829536,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "logs": {
+          "p50": 13.080216,
+          "p95": 27.096410000000002,
+          "p99": 31.082207,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "session_recording": {
+          "p50": 16.824373,
+          "p95": 34.332885,
+          "p99": 40.827882,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        }
+      },
+      "passed": true
+    },
+    {
+      "step": 3,
+      "targetEps": 400,
+      "actualEps": 399.9148312208899,
+      "ingest": {
+        "p50": 56.532129,
+        "p95": 832.657707,
+        "p99": 1470.28233,
+        "ok": 4799,
+        "errors": 0,
+        "errRate": 0
+      },
+      "reads": {
+        "dashboard_overview": {
+          "p50": 289.867151,
+          "p95": 923.764589,
+          "p99": 1173.134312,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "endpoints_grouped": {
+          "p50": 261.646427,
+          "p95": 709.673774,
+          "p99": 773.988495,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "exceptions_grouped": {
+          "p50": 71.733116,
+          "p95": 563.226229,
+          "p99": 821.034581,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "logs": {
+          "p50": 13.456759,
+          "p95": 149.533597,
+          "p99": 228.789043,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        },
+        "session_recording": {
+          "p50": 18.634242,
+          "p95": 135.73617800000002,
+          "p99": 249.53107,
+          "ok": 120,
+          "errors": 0,
+          "errRate": 0
+        }
+      },
+      "passed": true
+    },
+    {
+      "step": 4,
+      "targetEps": 800,
+      "actualEps": 482.57927984834976,
+      "ingest": {
+        "p50": 5611.703555,
+        "p95": 7753.112226,
+        "p99": 8179.903891,
+        "ok": 5791,
+        "errors": 0,
+        "errRate": 0
+      },
+      "reads": {
+        "dashboard_overview": {
+          "p50": 4349.410157,
+          "p95": 4922.875195,
+          "p99": 4943.60257,
+          "ok": 30,
+          "errors": 0,
+          "errRate": 0
+        },
+        "endpoints_grouped": {
+          "p50": 3109.361258,
+          "p95": 3743.0214579999997,
+          "p99": 3770.899297,
+          "ok": 41,
+          "errors": 0,
+          "errRate": 0
+        },
+        "exceptions_grouped": {
+          "p50": 3752.6588690000003,
+          "p95": 4157.843255000001,
+          "p99": 4366.165501,
+          "ok": 34,
+          "errors": 0,
+          "errRate": 0
+        },
+        "logs": {
+          "p50": 1202.26817,
+          "p95": 1604.1996219999999,
+          "p99": 1623.6233499999998,
+          "ok": 97,
+          "errors": 0,
+          "errRate": 0
+        },
+        "session_recording": {
+          "p50": 1216.879872,
+          "p95": 1623.349492,
+          "p99": 1785.009372,
+          "ok": 96,
+          "errors": 0,
+          "errRate": 0
+        }
+      },
+      "passed": false,
+      "failReason": "read endpoint \"endpoints_grouped\" p99 = 3771ms \u003e 3000ms threshold"
+    }
+  ]
+}
