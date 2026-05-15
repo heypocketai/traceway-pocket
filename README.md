@@ -71,6 +71,8 @@ cd traceway && docker compose up -d
 
 Point any OTel SDK at `http://localhost/api/otel/v1/traces` (or `/metrics`, `/logs`) and traces start flowing. See the [self-hosting docs](https://docs.tracewayapp.com/server/docker-compose) for production deployment, TLS, and storage configuration.
 
+**Docker images are cryptographically signed.** See [DOCKER_SIGNATURES.md](./DOCKER_SIGNATURES.md) to verify images before deploying.
+
 ### Embedded mode (inside your Go app)
 
 Run Traceway inside your Go process — no Docker, no external databases, SQLite under the hood:

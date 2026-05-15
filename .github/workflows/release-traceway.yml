@@ -31,6 +31,8 @@ on:
 permissions:
   contents: write
   actions: write
+  packages: write
+  id-token: write
 
 jobs:
   release:
@@ -160,10 +162,98 @@ jobs:
           gh workflow run release-website.yml --ref "${{ github.ref_name }}"
           gh workflow run release-docs.yml --ref "${{ github.ref_name }}"
 
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push full image
+        id: docker_build_full
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/traceway:v${{ inputs.version }}
+            ghcr.io/${{ github.repository_owner }}/traceway:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push minimal image
+        id: docker_build_minimal
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.minimal
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/traceway:v${{ inputs.version }}-minimal
+            ghcr.io/${{ github.repository_owner }}/traceway:minimal
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push SQLite image
+        id: docker_build_sqlite
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.sqlite
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/traceway:v${{ inputs.version }}-sqlite
+            ghcr.io/${{ github.repository_owner }}/traceway:sqlite
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.2.0'
+
+      - name: Sign full image
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/traceway@${{ steps.docker_build_full.outputs.digest }}
+
+      - name: Sign minimal image
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/traceway@${{ steps.docker_build_minimal.outputs.digest }}
+
+      - name: Sign SQLite image
+        env:
+          COSIGN_EXPERIMENTAL: 1
+        run: |
+          cosign sign --yes ghcr.io/${{ github.repository_owner }}/traceway@${{ steps.docker_build_sqlite.outputs.digest }}
+
       - name: Summary
         run: |
-          echo "Released backend/v${{ inputs.version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Docker Images (signed with Cosign)" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Users can now: \`go get github.com/tracewayapp/traceway/backend@v${{ inputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Full Image** (ClickHouse + PostgreSQL + supervisord):" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`ghcr.io/${{ github.repository_owner }}/traceway:v${{ inputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Website and docs deploys will run automatically on release publish." >> "$GITHUB_STEP_SUMMARY"
+          echo "**Minimal Image** (external ClickHouse/PostgreSQL):" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`ghcr.io/${{ github.repository_owner }}/traceway:v${{ inputs.version }}-minimal\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**SQLite Image** (embedded SQLite, single binary, no dependencies):" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`ghcr.io/${{ github.repository_owner }}/traceway:v${{ inputs.version }}-sqlite\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "All images tagged with version, plus \`latest\`, \`minimal\`, and \`sqlite\` respectively." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "See [DOCKER_SIGNATURES.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/DOCKER_SIGNATURES.md) to verify image signatures." >> "$GITHUB_STEP_SUMMARY"
