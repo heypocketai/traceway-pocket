@@ -35,7 +35,15 @@ case "${SCENARIO}" in
     *) echo "invalid BENCH_SCENARIO '${SCENARIO}' (expected throughput|read-probe)" >&2; exit 2 ;;
 esac
 
-RUN_ID="$(date -u +%Y%m%d-%H%M%S)-${TIER}-${MODE}-${SIGNAL}-${SCENARIO}-$RANDOM"
+# Hetzner caps server names at 63 chars; the prefix `bench-loadgen-` eats 14,
+# so the RUN_ID must stay <= 49 chars. Abbreviate the scenario to keep margin
+# for the worst combo (e.g. managed-ch + metrics + read-probe).
+case "${SCENARIO}" in
+    throughput) SCEN_SHORT="tp" ;;
+    read-probe) SCEN_SHORT="rp" ;;
+    *)          SCEN_SHORT="${SCENARIO}" ;;
+esac
+RUN_ID="$(date -u +%Y%m%d-%H%M%S)-${TIER}-${MODE}-${SIGNAL}-${SCEN_SHORT}-$RANDOM"
 echo "=== run-matrix-entry tier=${TIER} mode=${MODE} signal=${SIGNAL} scenario=${SCENARIO} duration=${DURATION} run_id=${RUN_ID} ===" >&2
 
 mkdir -p "${OUT_DIR}"
