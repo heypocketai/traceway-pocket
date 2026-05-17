@@ -54,3 +54,4 @@ backend/static/dist/
 /benchmarks/loadgen/loadgen-linux-amd64
 /benchmarks/loadgen/loadgen-linux-arm64
 /benchmarks/results/*-local/
+benchmarks/loadgen/bench-loadgen
