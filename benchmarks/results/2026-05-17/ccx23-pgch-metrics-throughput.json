@@ -1,0 +1,124 @@
+{
+  "tier": "ccx23",
+  "mode": "pgch",
+  "signal": "metrics",
+  "scenario": "throughput",
+  "startedAt": "2026-05-17T05:26:38Z",
+  "endedAt": "2026-05-17T05:38:38Z",
+  "phase1": {
+    "kind": "batch-size-ramp",
+    "fixedRequestRate": 5,
+    "steps": [
+      {
+        "step": 1,
+        "batchSize": 256,
+        "requestRate": 5,
+        "attemptedItemsPerSec": 1281.9797060239655,
+        "actualItemsPerSec": 1281.9797060239655,
+        "rejected": 0,
+        "ingest": {
+          "p50": 12.402124,
+          "p95": 14.302643999999999,
+          "p99": 16.109032999999997,
+          "ok": 601,
+          "errors": 0,
+          "errRate": 0
+        },
+        "passed": true
+      },
+      {
+        "step": 2,
+        "batchSize": 1024,
+        "requestRate": 5,
+        "attemptedItemsPerSec": 3865.4979451526383,
+        "actualItemsPerSec": 3865.4979451526383,
+        "rejected": 0,
+        "ingest": {
+          "p50": 14.268906,
+          "p95": 16.094958,
+          "p99": 17.467779,
+          "ok": 453,
+          "errors": 0,
+          "errRate": 0
+        },
+        "passed": true
+      },
+      {
+        "step": 3,
+        "batchSize": 4096,
+        "requestRate": 5,
+        "attemptedItemsPerSec": 15460.960138433571,
+        "actualItemsPerSec": 15460.960138433571,
+        "rejected": 0,
+        "ingest": {
+          "p50": 20.53238,
+          "p95": 23.312629,
+          "p99": 25.869392,
+          "ok": 453,
+          "errors": 0,
+          "errRate": 0
+        },
+        "passed": true
+      },
+      {
+        "step": 4,
+        "batchSize": 8192,
+        "requestRate": 5,
+        "attemptedItemsPerSec": 30920.18412901159,
+        "actualItemsPerSec": 30920.18412901159,
+        "rejected": 0,
+        "ingest": {
+          "p50": 29.90325,
+          "p95": 35.522935,
+          "p99": 39.122952000000005,
+          "ok": 453,
+          "errors": 0,
+          "errRate": 0
+        },
+        "passed": true
+      },
+      {
+        "step": 5,
+        "batchSize": 16384,
+        "requestRate": 5,
+        "attemptedItemsPerSec": 61830.839138394615,
+        "actualItemsPerSec": 61830.839138394615,
+        "rejected": 0,
+        "ingest": {
+          "p50": 48.979334,
+          "p95": 59.534576,
+          "p99": 65.88901399999999,
+          "ok": 453,
+          "errors": 0,
+          "errRate": 0
+        },
+        "passed": true
+      }
+    ],
+    "maxBatchSize": 16384
+  },
+  "phase2": {
+    "kind": "request-rate-ramp",
+    "fixedBatchSize": 8192,
+    "steps": [
+      {
+        "step": 1,
+        "batchSize": 8192,
+        "requestRate": 1,
+        "attemptedItemsPerSec": 0,
+        "actualItemsPerSec": 0,
+        "rejected": 0,
+        "ingest": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "ok": 0,
+          "errors": 0,
+          "errRate": 0
+        },
+        "passed": false,
+        "failReason": "no requests completed"
+      }
+    ]
+  }
+}
