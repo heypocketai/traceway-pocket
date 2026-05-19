@@ -63,16 +63,13 @@ func InitOAuth() {
 		secret = cfg.JWTSecret
 	}
 
-	store := sessions.NewFilesystemStore("", []byte(secret))
-	store.MaxLength(0)
-	store.Options = &sessions.Options{
+	gothic.Store = newDBSessionStore(secret, &sessions.Options{
 		Path:     "/",
 		HttpOnly: true,
 		MaxAge:   600,
 		Secure:   strings.HasPrefix(cfg.AppBaseURL, "https://"),
 		SameSite: http.SameSiteLaxMode,
-	}
-	gothic.Store = store
+	})
 
 	providers := []goth.Provider{}
 	base := strings.TrimRight(cfg.AppBaseURL, "/")

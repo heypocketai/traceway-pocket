@@ -36,4 +36,5 @@ func Start(ctx context.Context) {
 
 	startSQLiteRetention(ctx, daysRetentionSqlite)
 	startRecordingDiskCleanup(ctx, daysRetentionRecordings)
+	startOAuthSessionsPrune(ctx)
 }
