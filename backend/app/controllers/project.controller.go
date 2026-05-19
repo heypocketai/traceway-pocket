@@ -56,6 +56,11 @@ type CreateProjectRequest struct {
 	Framework string `json:"framework" binding:"required"`
 }
 
+type UpdateProjectRequest struct {
+	Name      string `json:"name" binding:"required"`
+	Framework string `json:"framework" binding:"required"`
+}
+
 func (p projectController) ListProjects(c *gin.Context) {
 	userId := middleware.GetUserId(c)
 
@@ -119,6 +124,63 @@ func (p projectController) CreateProject(c *gin.Context) {
 	cache.ProjectCache.AddProject(project)
 
 	c.JSON(http.StatusCreated, project.ToProjectWithBackendUrl())
+}
+
+func (p projectController) UpdateProject(c *gin.Context) {
+	var request UpdateProjectRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	nameLen := utf8.RuneCountInString(request.Name)
+	if nameLen < 1 || nameLen > 100 {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Project name must be between 1 and 100 characters"})
+		return
+	}
+	if !projectNameRegex.MatchString(request.Name) {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Project name can only contain letters, numbers, spaces, hyphens, and underscores"})
+		return
+	}
+	if !validFrameworks[request.Framework] {
+		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "Framework must be one of: gin, fiber, chi, fasthttp, stdlib, custom, react, svelte, vuejs, jquery, react-native, hono, cloudflare, opentelemetry, symfony, laravel, flutter, android"})
+		return
+	}
+
+	projectId, err := middleware.GetProjectId(c)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
+		return
+	}
+
+	tx := middleware.GetTx(c)
+	project, err := repositories.ProjectRepository.Update(tx, projectId, request.Name, request.Framework)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("error updating project: %w", err))
+		return
+	}
+
+	cache.ProjectCache.UpdateProject(project)
+
+	c.JSON(http.StatusOK, project.ToProjectWithBackendUrl())
+}
+
+func (p projectController) DeleteProject(c *gin.Context) {
+	projectId, err := middleware.GetProjectId(c)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("RequireProjectAccess middleware must be applied: %w", err))
+		return
+	}
+
+	tx := middleware.GetTx(c)
+	if err := repositories.ProjectRepository.Delete(tx, projectId); err != nil {
+		c.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("error deleting project: %w", err))
+		return
+	}
+
+	cache.ProjectCache.RemoveProject(projectId)
+
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 func (p projectController) GenerateSourceMapToken(c *gin.Context) {

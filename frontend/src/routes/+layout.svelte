@@ -7,10 +7,11 @@
 	import { incrementNavDepth, decrementNavDepth } from '$lib/utils/back-navigation';
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import AddProjectModal from '$lib/components/add-project-modal.svelte';
+	import EditProjectModal from '$lib/components/edit-project-modal.svelte';
 	import FrameworkIcon from '$lib/components/framework-icon.svelte';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Button } from '$lib/components/ui/button';
-	import { Sun, Moon, LogOut, Plus, Check } from '@lucide/svelte';
+	import { Sun, Moon, LogOut, Plus, Check, Pencil } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { ChevronDown } from 'lucide-svelte';
@@ -28,6 +29,7 @@
 
 	let { children } = $props();
 	let showAddProjectModal = $state(false);
+	let showEditProjectModal = $state(false);
 
 	// Track navigation depth for smart back buttons
 	let lastPathname = '';
@@ -131,6 +133,12 @@
 									<DropdownMenu.Item disabled>No projects yet</DropdownMenu.Item>
 								{/if}
 								<DropdownMenu.Separator />
+								{#if projectsState.canManageCurrentProject}
+									<DropdownMenu.Item onclick={() => showEditProjectModal = true} class="cursor-pointer">
+										<Pencil class="mr-2 h-4 w-4" />
+										Edit Project
+									</DropdownMenu.Item>
+								{/if}
 								<DropdownMenu.Item onclick={handleAddProjectClick} class="cursor-pointer">
 									<Plus class="mr-2 h-4 w-4" />
 									Add Project
@@ -167,6 +175,12 @@
 		open={showAddProjectModal}
 		onOpenChange={(open) => (showAddProjectModal = open)}
 		onProjectCreated={handleProjectCreated}
+	/>
+
+	<EditProjectModal
+		open={showEditProjectModal}
+		onOpenChange={(open) => (showEditProjectModal = open)}
+		project={projectsState.currentProject}
 	/>
 
 	<Toaster position="bottom-right" />

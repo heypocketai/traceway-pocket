@@ -148,6 +148,19 @@ class ProjectsState {
         return response;
     }
 
+    async updateProject(id: string, name: string, framework: Framework): Promise<Project> {
+        const response = await api.put('/projects', { name, framework }, {
+            projectId: id
+        });
+        await this.loadProjects();
+        return response;
+    }
+
+    async deleteProject(id: string): Promise<void> {
+        await api.delete('/projects', { projectId: id });
+        await this.loadProjects();
+    }
+
     async generateSourceMapToken(): Promise<string> {
         const resp = await api.post('/projects/source-map-token', {}, {
             projectId: this.currentProjectId ?? undefined

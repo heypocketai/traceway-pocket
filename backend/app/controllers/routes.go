@@ -41,6 +41,8 @@ func RegisterControllers(router *gin.RouterGroup) {
 	// Project management
 	router.GET("/projects", middleware.UseAppAuth, ProjectController.ListProjects)
 	router.POST("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, ProjectController.CreateProject)
+	router.PUT("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, ProjectController.UpdateProject)
+	router.DELETE("/projects", middleware.UseAppAuth, middleware.RequireProjectAccess, middleware.RequireWriteAccess, middleware.Transactional, ProjectController.DeleteProject)
 
 	// Dashboard endpoints (projectId in query param)
 	router.POST("/stats", middleware.UseAppAuth, middleware.RequireProjectAccess, MetricRecordController.FindHomepageStats)

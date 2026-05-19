@@ -97,6 +97,31 @@ func (c *projectCache) AddProject(proj *models.Project) {
 	}
 }
 
+func (c *projectCache) UpdateProject(proj *models.Project) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cached, ok := c.projectsById[proj.Id]
+	if !ok {
+		return
+	}
+	cached.Name = proj.Name
+	cached.Framework = proj.Framework
+}
+
+func (c *projectCache) RemoveProject(id uuid.UUID) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	proj, ok := c.projectsById[id]
+	if !ok {
+		return
+	}
+	delete(c.projects, proj.Token)
+	delete(c.projectsById, id)
+	if proj.SourceMapToken != nil {
+		delete(c.projectsBySourceMapToken, *proj.SourceMapToken)
+	}
+}
+
 func (c *projectCache) GetBySourceMapToken(token string) *models.Project {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

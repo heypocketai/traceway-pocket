@@ -184,6 +184,40 @@ func (p *projectRepository) GenerateSourceMapToken(tx *sql.Tx, projectId uuid.UU
 	return token, nil
 }
 
+func (p *projectRepository) Update(tx *sql.Tx, id uuid.UUID, name string, framework string) (*models.Project, error) {
+	project, err := p.FindById(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if project == nil {
+		return nil, fmt.Errorf("project not found: %s", id)
+	}
+	project.Name = name
+	project.Framework = framework
+	err = lit.UpdateNamed[models.Project](tx, project, "id = :id", lit.P{"id": id})
+	if err != nil {
+		return nil, err
+	}
+	return project, nil
+}
+
+func (p *projectRepository) Delete(tx *sql.Tx, id uuid.UUID) error {
+	related := []string{
+		"notification_history",
+		"notification_rules",
+		"notification_channels",
+		"widget_groups",
+		"source_maps",
+		"metric_registry",
+	}
+	for _, table := range related {
+		if err := lit.Delete(tx, "DELETE FROM "+table+" WHERE project_id = $1", id); err != nil {
+			return fmt.Errorf("deleting %s: %w", table, err)
+		}
+	}
+	return lit.Delete(tx, "DELETE FROM projects WHERE id = $1", id)
+}
+
 func (p *projectRepository) FindBySourceMapToken(tx *sql.Tx, token string) (*models.Project, error) {
 	return lit.SelectSingleNamed[models.Project](
 		tx,
