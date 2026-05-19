@@ -77,22 +77,20 @@ Then configure the GitHub channel in Traceway:
 
 ### Setting Up Telegram
 
-To send alerts to a Telegram user or group, you need a **Bot Token** and a **Chat ID**:
+To send alerts to Telegram, you need a **Bot Token** and a **Chat ID**:
 
-1. Open Telegram and start a chat with [@BotFather](https://t.me/BotFather)
-2. Send `/newbot`, then follow the prompts to give your bot a name and username
-3. BotFather will reply with a **Bot Token** in the form `123456789:ABCdefGhIJKlmNoPQRstuVwxyZ` — copy it
-4. Decide where the bot should post:
-   - **Direct messages:** open a chat with your new bot and send it any message, then visit `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` in a browser and copy the `chat.id` value from the response
-   - **Group chat:** add the bot to the group, send a message in the group, then visit the same `getUpdates` URL and copy the `chat.id` (group IDs are negative numbers, e.g. `-1001234567890`)
-5. Send a `/start` message to the bot at least once so it is allowed to message you
+1. Open Telegram and start a chat with [@BotFather](https://t.me/BotFather). Send `/newbot` and follow the prompts to give your bot a name and username. BotFather will reply with a **Bot Token** in the form `123456789:ABCdefGhIJKlmNoPQRstuVwxyZ` — copy it.
+2. Open a chat with your new bot and send it `/start` so it is allowed to message you.
+3. Create a private channel in Telegram for the alerts.
+4. Open the channel's settings → **Administrators** → **Add Admin**, search for your bot's username, and add it with permission to post messages.
+5. Forward any message from the channel to [@userinfobot](https://t.me/userinfobot) — it will reply with the channel's **Chat ID** (a negative number, e.g. `-1001234567890`). Copy it including the minus sign.
 
 Then configure the Telegram channel in Traceway:
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | Bot Token | Yes | The token BotFather gave you |
-| Chat ID | Yes | The destination user or group chat ID |
+| Chat ID | Yes | The destination channel ID (e.g. `-1001234567890`) |
 
 ### Webhook Payload
 
