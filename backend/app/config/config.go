@@ -52,6 +52,21 @@ type Cfg struct {
 	GitHubClientID     string
 	GitHubClientSecret string
 	OAuthSessionSecret string
+
+	OIDCClientID        string
+	OIDCClientSecret    string
+	OIDCDiscoveryURL    string
+	OIDCDisplayName     string
+	OIDCAutoCreateUsers string
+	OIDCOrgClaim        string
+	OIDCExtraScopes     string
+	OIDCRoleClaim       string
+	OIDCRoleMap         string
+	OIDCAuthURL         string
+	OIDCTokenURL        string
+	OIDCUserInfoURL     string
+
+	DisablePasswordLogin string
 }
 
 var Config *Cfg
@@ -109,5 +124,20 @@ func LoadFromEnv() *Cfg {
 		GitHubClientID:     os.Getenv("GITHUB_CLIENT_ID"),
 		GitHubClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
 		OAuthSessionSecret: os.Getenv("OAUTH_SESSION_SECRET"),
+
+		OIDCClientID:        os.Getenv("OIDC_CLIENT_ID"),
+		OIDCClientSecret:    os.Getenv("OIDC_CLIENT_SECRET"),
+		OIDCDiscoveryURL:    os.Getenv("OIDC_DISCOVERY_URL"),
+		OIDCDisplayName:     os.Getenv("OIDC_DISPLAY_NAME"),
+		OIDCAutoCreateUsers: os.Getenv("OIDC_AUTO_CREATE_USERS"),
+		OIDCOrgClaim:        os.Getenv("OIDC_ORG_CLAIM"),
+		OIDCExtraScopes:     os.Getenv("OIDC_EXTRA_SCOPES"),
+		OIDCRoleClaim:       os.Getenv("OIDC_ROLE_CLAIM"),
+		OIDCRoleMap:         os.Getenv("OIDC_ROLE_MAP"),
+		OIDCAuthURL:         os.Getenv("OIDC_AUTH_URL"),
+		OIDCTokenURL:        os.Getenv("OIDC_TOKEN_URL"),
+		OIDCUserInfoURL:     os.Getenv("OIDC_USER_INFO_URL"),
+
+		DisablePasswordLogin: os.Getenv("DISABLE_PASSWORD_LOGIN"),
 	}
 }

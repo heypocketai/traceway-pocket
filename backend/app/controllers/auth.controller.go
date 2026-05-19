@@ -31,6 +31,11 @@ func (a authController) HasOrganizations(c *gin.Context) {
 }
 
 func (a authController) Login(c *gin.Context) {
+	if config.Config.DisablePasswordLogin == "true" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Password login is disabled. Please use SSO to sign in."})
+		return
+	}
+
 	var request models.LoginRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid email or password"})
@@ -81,6 +86,11 @@ func (a authController) Login(c *gin.Context) {
 }
 
 func (a authController) Register(c *gin.Context) {
+	if config.Config.DisablePasswordLogin == "true" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Password login is disabled. Please use SSO to sign in."})
+		return
+	}
+
 	var request models.RegisterRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})

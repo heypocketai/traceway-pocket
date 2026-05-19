@@ -34,6 +34,8 @@
     let error = $state('');
     let loading = $state(false);
     let captchaToken = $state('');
+    let passwordLoginEnabled = $state(true);
+    let providersLoaded = $state(false);
 
     const turnstileSiteKey = __TURNSTILE_SITE_KEY__;
     const captchaEnabled = turnstileSiteKey !== '';
@@ -42,8 +44,15 @@
 
     if (!__CLOUD_MODE__) {
         $effect(() => {
-            // if we're not in the cloud mode we have to check if an organization exists and if it does we should go to the login page
+            if (!providersLoaded) return;
 
+            // Password login is disabled — this page is inaccessible, send to login.
+            if (!passwordLoginEnabled) {
+                goto("/login");
+                return;
+            }
+
+            // if we're not in the cloud mode we have to check if an organization exists and if it does we should go to the login page
             loading = true;
             fetch('/api/has-organizations', {
                 method: 'GET',
@@ -146,7 +155,8 @@
                     </AlertDescription>
                 </Alert>
             {/if}
-            <OauthButtons />
+            <OauthButtons bind:passwordLoginEnabled bind:loaded={providersLoaded} />
+            {#if providersLoaded && passwordLoginEnabled}
             <form onsubmit={(e) => { e.preventDefault(); handleRegister(); }} class="grid w-full items-center gap-4">
                 <div class="flex flex-col space-y-1.5">
                     <Label for="email">Email</Label>
@@ -222,6 +232,7 @@
                     {/if}
                 </Button>
             </form>
+            {/if}
         </CardContent>
 
         {#if __CLOUD_MODE__}

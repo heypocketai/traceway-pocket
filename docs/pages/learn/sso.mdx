@@ -1,6 +1,6 @@
 # Single Sign-On (SSO)
 
-Traceway supports signing in with **Google** and **GitHub** in addition to email + password. SSO is optional — if you don't configure a provider, only its `Continue with …` button is hidden, the rest of the dashboard works exactly the same.
+Traceway supports signing in with **Google**, **GitHub**, and any **standards-compliant OIDC provider** (Authentik, Keycloak, Dex, Okta, etc.) in addition to email + password. SSO is optional — if you don't configure a provider, only its `Continue with …` button is hidden, the rest of the dashboard works exactly the same.
 
 When at least one provider is configured, the buttons appear on the login and register pages, the backend exposes `GET /api/auth/providers`, and `GET /api/auth/start/{provider}` kicks off the OAuth flow.
 
@@ -26,18 +26,33 @@ Sign-in matching, in order:
 
 In **self-hosted mode** (`CLOUD_MODE` unset or not `true`), once any organization exists, OAuth signups for unknown emails are blocked with `invite_required` — they have to be invited to the org first, just like password signups. In cloud mode (`CLOUD_MODE=true`), OAuth signups always create an account and prompt the user through `/finish-setup`.
 
+The OIDC provider can bypass this restriction with `OIDC_AUTO_CREATE_USERS=true` — see below.
+
 ## Environment variables
 
-Set these on the backend container/process. Both pairs are independent — you can configure one provider, both, or neither.
+Set these on the backend container/process. All provider pairs are independent — configure one, several, or none.
 
-| Variable               | Required when              | Description                                                                                                                                                           |
-| ---------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `APP_BASE_URL`         | Either provider configured | Public URL of your Traceway instance, e.g. `https://traceway.example.com`. Used to build the OAuth callback URL the providers redirect back to.                       |
-| `GOOGLE_CLIENT_ID`     | Enabling Google            | OAuth client ID from Google Cloud Console                                                                                                                             |
-| `GOOGLE_CLIENT_SECRET` | Enabling Google            | OAuth client secret from Google Cloud Console                                                                                                                         |
-| `GITHUB_CLIENT_ID`     | Enabling GitHub            | OAuth App client ID from GitHub                                                                                                                                       |
-| `GITHUB_CLIENT_SECRET` | Enabling GitHub            | OAuth App client secret from GitHub                                                                                                                                   |
-| `OAUTH_SESSION_SECRET` | Optional                   | Cookie-store signing secret used during the OAuth round-trip. Falls back to `JWT_SECRET` when unset. Set explicitly to rotate cookie-signing independently from JWTs. |
+| Variable                  | Required when              | Description                                                                                                                                                           |
+| ------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_BASE_URL`            | Any provider configured    | Public URL of your Traceway instance, e.g. `https://traceway.example.com`. Used to build the OAuth callback URL the providers redirect back to.                       |
+| `GOOGLE_CLIENT_ID`        | Enabling Google            | OAuth client ID from Google Cloud Console                                                                                                                             |
+| `GOOGLE_CLIENT_SECRET`    | Enabling Google            | OAuth client secret from Google Cloud Console                                                                                                                         |
+| `GITHUB_CLIENT_ID`        | Enabling GitHub            | OAuth App client ID from GitHub                                                                                                                                       |
+| `GITHUB_CLIENT_SECRET`    | Enabling GitHub            | OAuth App client secret from GitHub                                                                                                                                   |
+| `OIDC_CLIENT_ID`          | Enabling OIDC              | Client ID from your OIDC provider                                                                                                                                     |
+| `OIDC_CLIENT_SECRET`      | Enabling OIDC              | Client secret from your OIDC provider                                                                                                                                 |
+| `OIDC_DISCOVERY_URL`      | Enabling OIDC (discovery)  | Full URL to the provider's OpenID Connect discovery document (usually ends in `/.well-known/openid-configuration`). Either this or all three `OIDC_*_URL` vars below must be set. |
+| `OIDC_AUTH_URL`           | Enabling OIDC (manual)     | Authorization endpoint URL. Use when your provider does not support OIDC discovery. Requires `OIDC_TOKEN_URL` and `OIDC_USER_INFO_URL` too.                           |
+| `OIDC_TOKEN_URL`          | Enabling OIDC (manual)     | Token endpoint URL. See `OIDC_AUTH_URL`.                                                                                                                              |
+| `OIDC_USER_INFO_URL`      | Enabling OIDC (manual)     | UserInfo endpoint URL. See `OIDC_AUTH_URL`.                                                                                                                           |
+| `OIDC_DISPLAY_NAME`       | Optional                   | Label shown on the login/register button. Defaults to `SSO` if unset.                                                                                                |
+| `OIDC_AUTO_CREATE_USERS`  | Optional                   | Set `true` to allow automatic account creation and org membership for unknown emails in self-hosted mode. See [Auto-creating OIDC users](#auto-creating-oidc-users).  |
+| `OIDC_ORG_CLAIM`          | Optional                   | Multi-org only. Name of a custom claim in the ID token whose value is the Traceway organization name to join. Falls back to the first organization if unset or the claim is absent. See [Routing users to organizations](#routing-users-to-organizations). |
+| `OIDC_EXTRA_SCOPES`       | Optional                   | Comma-separated list of additional OAuth scopes to request. Required when using `OIDC_ORG_CLAIM` so the provider includes the custom claim in the token (e.g. `traceway`). |
+| `OIDC_ROLE_CLAIM`         | Optional                   | Dot-notation path to the claim in the ID token that holds the user's role(s), e.g. `realm_access.roles` or `groups`. See [Role mapping](#role-mapping).               |
+| `OIDC_ROLE_MAP`           | Optional                   | JSON object mapping claim values to Traceway roles (`admin`, `user`, `readonly`), e.g. `{"kc-admin":"admin","kc-ro":"readonly"}`. See [Role mapping](#role-mapping).  |
+| `OAUTH_SESSION_SECRET`    | Optional                   | Cookie-store signing secret used during the OAuth round-trip. Falls back to `JWT_SECRET` when unset. Set explicitly to rotate cookie-signing independently from JWTs. |
+| `DISABLE_PASSWORD_LOGIN`  | Optional                   | Set `true` to hide the email/password form and block the `/api/login` and `/api/register` endpoints. Users can only sign in via a configured SSO provider. See [Forcing SSO-only login](#forcing-sso-only-login). |
 
 The cookie used during the round-trip is automatically marked `Secure` when `APP_BASE_URL` starts with `https://`, and `SameSite=Lax` either way.
 
@@ -88,20 +103,268 @@ The SDK requests the `user:email` scope, so the user's primary email needs to be
 
 6. Restart the backend.
 
+## Setting up a generic OIDC provider
+
+Any provider that implements OpenID Connect works: Authentik, Keycloak, Dex, Okta, and others. The steps below use **Authentik** as a worked example, but the redirect URI and discovery URL patterns are the same for all compliant providers.
+
+### Creating the application in Authentik
+
+1. In the Authentik admin UI, go to **Applications → Providers → Create**.
+2. Choose **OAuth2/OpenID Connect Provider**.
+3. Configure it:
+   - **Name** — e.g. `traceway`.
+   - **Client type** — **Confidential**.
+   - **Client ID / Client Secret** — Authentik generates these; copy them.
+   - **Redirect URIs** — add exactly: `{APP_BASE_URL}/api/auth/callback/oidc`
+     (e.g. `https://traceway.example.com/api/auth/callback/oidc`). No trailing slash.
+   - **Scopes** — ensure `openid`, `email`, and `profile` are selected.
+4. Go to **Applications → Create** and link the provider you just created.
+
+### Finding the discovery URL
+
+In Authentik the discovery URL follows this pattern:
+
+```
+https://{authentik-host}/application/o/{app-slug}/.well-known/openid-configuration
+```
+
+For example:
+
+```
+https://auth.example.com/application/o/traceway/.well-known/openid-configuration
+```
+
+Open it in a browser to confirm it returns a JSON document — this is the URL you set as `OIDC_DISCOVERY_URL`.
+
+### Environment variables
+
+```
+APP_BASE_URL=https://traceway.example.com
+OIDC_CLIENT_ID=<client id from Authentik>
+OIDC_CLIENT_SECRET=<client secret from Authentik>
+OIDC_DISCOVERY_URL=https://auth.example.com/application/o/traceway/.well-known/openid-configuration
+OIDC_DISPLAY_NAME=Authentik SSO
+```
+
+Restart the backend. The discovery document is fetched once at startup; if the URL is unreachable the OIDC provider is disabled and an error is logged.
+
+## Setting up Keycloak
+
+Keycloak is a popular open-source identity provider. The setup follows the same pattern as other OIDC providers, with realm-based URLs.
+
+### Creating the client in Keycloak
+
+1. In the Keycloak admin console, select your realm (or create one).
+2. Go to **Clients → Create client**.
+3. Configure it:
+   - **Client type** — **OpenID Connect**.
+   - **Client ID** — e.g. `traceway`.
+   - **Client authentication** — **On** (makes it a confidential client).
+4. On the **Settings** tab:
+   - **Valid redirect URIs** — add `{APP_BASE_URL}/api/auth/callback/oidc` (e.g. `https://traceway.example.com/api/auth/callback/oidc`).
+   - **Web origins** — add your `APP_BASE_URL`.
+5. On the **Credentials** tab, copy the **Client secret**.
+
+### Discovery URL
+
+Keycloak exposes a per-realm discovery document at:
+
+```
+https://{keycloak-host}/realms/{realm}/.well-known/openid-configuration
+```
+
+For example:
+
+```
+https://keycloak.example.com/realms/myrealm/.well-known/openid-configuration
+```
+
+Open it in a browser to confirm it returns JSON before setting it as `OIDC_DISCOVERY_URL`.
+
+### Environment variables
+
+```
+APP_BASE_URL=https://traceway.example.com
+OIDC_CLIENT_ID=traceway
+OIDC_CLIENT_SECRET=<client secret from Keycloak>
+OIDC_DISCOVERY_URL=https://keycloak.example.com/realms/myrealm/.well-known/openid-configuration
+OIDC_DISPLAY_NAME=Keycloak SSO
+```
+
+Restart the backend.
+
+## Auto-creating OIDC users
+
+By default, OIDC follows the same rules as Google and GitHub: in self-hosted mode, once an organization exists, unknown emails get `invite_required`. Set `OIDC_AUTO_CREATE_USERS=true` to bypass this:
+
+```
+OIDC_AUTO_CREATE_USERS=true
+```
+
+With this flag, any user who authenticates successfully via OIDC is automatically:
+- Given a Traceway account (if they don't have one yet), and
+- Added to a Traceway organization with the `user` role (or the role resolved by `OIDC_ROLE_MAP` if configured — see [Role mapping](#role-mapping)).
+
+This applies on every sign-in, not just the first — so existing accounts that were created before this flag was set will also be joined to the organization on their next login.
+
+On a **single-organization** instance this is all you need. No additional configuration is required.
+
+Do not enable this on a public-facing instance with an external OIDC provider unless you want anyone with a valid OIDC account to be able to register.
+
+## Role mapping
+
+By default, OIDC users are added to organizations with the `user` role. Role mapping lets you automatically assign Traceway roles based on claims in the OIDC token — useful for enterprise IAM systems like Keycloak where group or role membership is already managed centrally.
+
+Two env vars control this:
+
+| Variable          | Example value                              | Description                                                                                              |
+| ----------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `OIDC_ROLE_CLAIM` | `realm_access.roles`                       | Dot-notation path to the claim holding the role value(s). Supports nested objects and string arrays.     |
+| `OIDC_ROLE_MAP`   | `{"traceway-admin":"admin","traceway-ro":"readonly"}` | JSON object mapping claim values to Traceway roles (`admin`, `user`, or `readonly`). |
+
+Role mapping is applied on **every login**, not just the first — so changing a user's role in your IdP takes effect on their next sign-in.
+
+**Priority order:** When a user has multiple claim values that match different roles, the highest-privilege match wins: `admin` > `user` > `readonly`. The `owner` role is never assigned automatically — it can only be set manually by an existing owner.
+
+### Keycloak example — realm roles
+
+Keycloak includes realm-level roles in the token under `realm_access.roles`:
+
+```json
+{
+  "realm_access": {
+    "roles": ["traceway-admin", "offline_access", "uma_authorization"]
+  }
+}
+```
+
+To map `traceway-admin` to the Traceway `admin` role:
+
+```
+OIDC_ROLE_CLAIM=realm_access.roles
+OIDC_ROLE_MAP={"traceway-admin":"admin","traceway-user":"user","traceway-readonly":"readonly"}
+```
+
+Create matching realm roles in Keycloak (**Realm Settings → Roles → Create role**) and assign them to users or groups.
+
+### Generic example — groups claim
+
+Many providers expose group membership as a top-level `groups` claim:
+
+```json
+{
+  "groups": ["/admins", "/users"]
+}
+```
+
+```
+OIDC_ROLE_CLAIM=groups
+OIDC_ROLE_MAP={"/admins":"admin","/users":"user"}
+```
+
+### Adding the claim in Authentik
+
+Authentik doesn't include role or group claims by default. Add them via a scope mapping:
+
+1. Go to **Customization → Property Mappings → Create → Scope Mapping**.
+2. Set the **Scope name** to a custom scope (e.g. `traceway`).
+3. Set the **Expression** to return the claim:
+   ```python
+   return {"groups": [g.name for g in request.user.ak_groups.all()]}
+   ```
+4. Add `traceway` to your provider's scope list and to `OIDC_EXTRA_SCOPES`:
+   ```
+   OIDC_EXTRA_SCOPES=traceway
+   OIDC_ROLE_CLAIM=groups
+   OIDC_ROLE_MAP={"traceway-admins":"admin","traceway-users":"user"}
+   ```
+
+## Routing users to organizations
+
+> This section only applies to **multi-organization** instances. If you have one organization, `OIDC_AUTO_CREATE_USERS=true` is sufficient — users are automatically added to it.
+
+By default, auto-created OIDC users are added to the first organization in the instance. To route users to a specific organization on a multi-org instance, use a custom claim in the ID token:
+
+**Step 1** — Set `OIDC_ORG_CLAIM` to the name of the claim that will carry the organization name:
+
+```
+OIDC_ORG_CLAIM=traceway_org
+```
+
+**Step 2** — Set `OIDC_EXTRA_SCOPES` to the scope that exposes the claim (so Traceway requests it from the provider):
+
+```
+OIDC_EXTRA_SCOPES=traceway
+```
+
+**Step 3** — Configure your OIDC provider to include the claim in the token (see below).
+
+When a user signs in, Traceway reads the `traceway_org` claim from the ID token and looks up the organization by name. If the claim is absent or the name doesn't match any organization, it falls back to the first organization.
+
+The organization name in the claim must exactly match the name in Traceway — it is case-sensitive.
+
+### Adding the claim in Authentik
+
+1. Go to **Customization → Property Mappings → Create → Scope Mapping**.
+2. Set the **Scope name** to `traceway` (must match `OIDC_EXTRA_SCOPES`).
+3. Set the **Expression** to return the claim:
+   ```python
+   return {"traceway_org": "My Organization Name"}
+   ```
+   You can make this dynamic per-user using Authentik's expression variables (e.g. `request.user.ak_groups.all()`).
+4. Go to your Traceway OIDC provider → **Advanced protocol settings → Scopes** and add `traceway` to the list alongside `openid email profile`.
+
+This works identically with any OIDC-compliant provider — Keycloak, Okta, Dex, and others all support custom claims via their own claim/attribute mapping configuration.
+
+## Providers without OIDC discovery
+
+Most modern OIDC providers support the discovery document at `/.well-known/openid-configuration`. For providers that don't, you can specify the three endpoint URLs directly instead of `OIDC_DISCOVERY_URL`:
+
+```
+OIDC_CLIENT_ID=traceway
+OIDC_CLIENT_SECRET=<secret>
+OIDC_AUTH_URL=https://provider.example.com/oauth/authorize
+OIDC_TOKEN_URL=https://provider.example.com/oauth/token
+OIDC_USER_INFO_URL=https://provider.example.com/oauth/userinfo
+```
+
+All three manual URLs must be set together — you cannot mix them with `OIDC_DISCOVERY_URL`. If `OIDC_DISCOVERY_URL` is set, it takes precedence and the manual URLs are ignored.
+
+## Forcing SSO-only login
+
+Set `DISABLE_PASSWORD_LOGIN=true` to remove the email/password form entirely and require all users to authenticate via a configured SSO provider:
+
+```
+DISABLE_PASSWORD_LOGIN=true
+```
+
+With this flag:
+- The email/password form is hidden on the login and register pages.
+- `POST /api/login` and `POST /api/register` return `403 Forbidden` — existing scripts or integrations that use password auth will fail explicitly rather than silently.
+- The "or" divider between SSO buttons and the password form is also removed.
+
+On a self-hosted instance with no organizations yet, the first user is created and onboarded through the SSO flow (via `/finish-setup`) rather than the register page. Pair this with `OIDC_AUTO_CREATE_USERS=true` so the first login automatically provisions the account without needing an invitation.
+
 ## Verifying
 
 After restart:
 
 ```bash
 curl https://traceway.example.com/api/auth/providers
-# {"providers":["google","github"]}
+# {"providers":["google","github","oidc"],"providerLabels":{"oidc":"Authentik SSO"},"passwordLoginEnabled":true}
 ```
 
-If the array is empty, the backend didn't see your env vars. Common causes:
+`passwordLoginEnabled` is `false` when `DISABLE_PASSWORD_LOGIN=true`.
+
+If the `oidc` entry is missing but you set the env vars, check the backend logs — a failed discovery URL fetch is logged at startup. Common causes:
+
+- The discovery URL is wrong or the OIDC provider is not reachable from the backend container at startup.
+- Only some of the required OIDC vars are set. Either `OIDC_DISCOVERY_URL` or all three of `OIDC_AUTH_URL` + `OIDC_TOKEN_URL` + `OIDC_USER_INFO_URL` must be provided, together with `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET`.
+
+If the array is empty for all providers, the backend didn't see your env vars. Common causes:
 
 - The container was started before the secrets were set — recreate, don't just restart.
 - The variables were set in a different shell than the one that launched `go run` / `docker run`.
-- For embedded backend usage (`cmd.Run(opts...)`), the option-mode config path doesn't read OS env vars — set them at the call site or use the no-options form.
 
 Once `/api/auth/providers` reports the providers, the buttons appear automatically on the login and register pages.
 
@@ -121,3 +384,4 @@ The OAuth callback redirects back to `/login?error=<code>` when something goes w
 - The transient cookie used by gothic during the round-trip is `HttpOnly`, `SameSite=Lax`, and 10-minute lifetime. It only carries the OAuth state and PKCE verifier — never a long-lived session.
 - `OAUTH_SESSION_SECRET` rotates the cookie signing key. Rotating it invalidates any in-flight OAuth round-trips but does not affect issued JWTs (those are signed with `JWT_SECRET`).
 - An OAuth-only user has an empty password hash. Password login for them always fails — `CheckPassword` short-circuits on empty hashes.
+- Role mapping (`OIDC_ROLE_MAP`) never elevates a user to `owner` — that role can only be assigned manually by an existing owner.

@@ -44,6 +44,21 @@ func (r *organizationRepository) HasOrganizations(tx *sql.Tx) (bool, error) {
 	return result.Count > 0, nil
 }
 
+func (r *organizationRepository) FindFirst(tx *sql.Tx) (*models.Organization, error) {
+	return lit.SelectSingle[models.Organization](
+		tx,
+		"SELECT id, name, timezone, created_at FROM organizations ORDER BY created_at ASC LIMIT 1",
+	)
+}
+
+func (r *organizationRepository) FindByName(tx *sql.Tx, name string) (*models.Organization, error) {
+	return lit.SelectSingleNamed[models.Organization](
+		tx,
+		"SELECT id, name, timezone, created_at FROM organizations WHERE name = :name LIMIT 1",
+		lit.P{"name": name},
+	)
+}
+
 func (r *organizationRepository) FindById(tx *sql.Tx, id int) (*models.Organization, error) {
 	return lit.SelectSingleNamed[models.Organization](
 		tx,

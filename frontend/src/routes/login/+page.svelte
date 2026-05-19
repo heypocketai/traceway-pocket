@@ -32,6 +32,8 @@
 
     let error = $state(initialError ? (ERROR_MESSAGES[initialError] ?? 'Sign-in failed. Please try again.') : '');
     let loading = $state(false);
+    let passwordLoginEnabled = $state(true);
+    let providersLoaded = $state(false);
 
     if (initialError) {
         const cleanUrl = new URL(window.location.href);
@@ -44,7 +46,9 @@
 
     if (!__CLOUD_MODE__) {
         $effect(() => {
-        // if we're not in the cloud mode we have to check if an organization exists and if it does not we need to take the user to the register page
+            // Wait for providers to load — if password login is disabled, skip the /register redirect.
+            if (!providersLoaded) return;
+            if (!passwordLoginEnabled) return;
 
             loading = true;
             fetch('/api/has-organizations', {
@@ -123,7 +127,8 @@
                     </AlertDescription>
                 </Alert>
             {/if}
-            <OauthButtons />
+            <OauthButtons bind:passwordLoginEnabled bind:loaded={providersLoaded} />
+            {#if providersLoaded && passwordLoginEnabled}
             <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} class="grid w-full items-center gap-4">
                 <div class="flex flex-col space-y-1.5">
                     <Label for="email">Email</Label>
@@ -142,6 +147,7 @@
                     {/if}
                 </Button>
             </form>
+            {/if}
         </CardContent>
 
         <!-- If the backend is running in the cloud mode we'll allow registration to take place -->
