@@ -47,7 +47,7 @@
 	let pushoverUserKey = $state('');
 	let pushoverAppToken = $state('');
 	let pushoverDevice = $state('');
-	let pushoverPriority = $state(0);
+	let pushoverPriority = $state('0');
 	let pushoverRetry = $state(30);
 	let pushoverExpire = $state(3600);
 	let pushoverCallback = $state('');
@@ -84,7 +84,7 @@
 		pushoverUserKey = '';
 		pushoverAppToken = '';
 		pushoverDevice = '';
-		pushoverPriority = 0;
+		pushoverPriority = '0';
 		pushoverRetry = 30;
 		pushoverExpire = 3600;
 		pushoverCallback = '';
@@ -123,7 +123,7 @@
 			pushoverUserKey = config.userKey || '';
 			pushoverAppToken = config.appToken || '';
 			pushoverDevice = config.device || '';
-			pushoverPriority = config.priority ?? 0;
+			pushoverPriority = String(config.priority ?? 0);
 			pushoverRetry = config.retry ?? 30;
 			pushoverExpire = config.expire ?? 3600;
 			pushoverCallback = config.callback || '';
@@ -169,15 +169,15 @@
 				appToken: pushoverAppToken
 			};
 			if (pushoverDevice) config.device = pushoverDevice;
-			if (pushoverPriority) config.priority = pushoverPriority;
-			if (pushoverPriority === 2) {
-				config.retry = pushoverRetry;
-				config.expire = pushoverExpire;
+			if (pushoverPriority !== '0') config.priority = Number(pushoverPriority);
+			if (pushoverPriority === '2') {
+				config.retry = Number(pushoverRetry);
+				config.expire = Number(pushoverExpire);
 				if (pushoverCallback) config.callback = pushoverCallback;
 			}
 			if (pushoverSound) config.sound = pushoverSound;
 			if (pushoverHtml) config.html = pushoverHtml;
-			if (pushoverTtl > 0) config.ttl = pushoverTtl;
+			if (Number(pushoverTtl) > 0) config.ttl = Number(pushoverTtl);
 			return config;
 		}
 		return {};
@@ -440,16 +440,16 @@
 					<Label for="po-priority">Priority</Label>
 					<Select.Root type="single" bind:value={pushoverPriority}>
 						<Select.Trigger class="w-full">
-							{pushoverPriority === 0 ? 'Normal' : pushoverPriority === 1 ? 'High' : 'Emergency'}
+							{pushoverPriority === '0' ? 'Normal' : pushoverPriority === '1' ? 'High' : 'Emergency'}
 						</Select.Trigger>
 						<Select.Content>
-							<Select.Item value={0}>Normal</Select.Item>
-							<Select.Item value={1}>High</Select.Item>
-							<Select.Item value={2}>Emergency</Select.Item>
+							<Select.Item value="0">Normal</Select.Item>
+							<Select.Item value="1">High</Select.Item>
+							<Select.Item value="2">Emergency</Select.Item>
 						</Select.Content>
 					</Select.Root>
 				</div>
-				{#if pushoverPriority === 2}
+				{#if pushoverPriority === '2'}
 					<div class="space-y-2">
 						<Label for="po-retry">Retry Interval (seconds, min 30)</Label>
 						<Input id="po-retry" type="number" bind:value={pushoverRetry} min={30} />
