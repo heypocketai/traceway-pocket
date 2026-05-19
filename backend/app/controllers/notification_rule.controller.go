@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
@@ -43,7 +44,7 @@ func (ctrl *notificationRuleController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	rules, err := repositories.NotificationRuleRepository.FindByProjectWithChannel(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list notification rules: %w", err))
@@ -103,7 +104,7 @@ func (ctrl *notificationRuleController) Create(ctx *gin.Context) {
 		req.CooldownMinutes = 15
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	channel, err := repositories.NotificationChannelRepository.FindById(tx, req.ChannelId)
 	if err != nil {
@@ -188,7 +189,7 @@ func (ctrl *notificationRuleController) Update(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	existing, err := repositories.NotificationRuleRepository.FindById(tx, id)
 	if err != nil {
@@ -245,7 +246,7 @@ func (ctrl *notificationRuleController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	existing, err := repositories.NotificationRuleRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to delete notification rule: %w", err))
@@ -278,7 +279,7 @@ func (ctrl *notificationRuleController) Toggle(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	existing, err := repositories.NotificationRuleRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find notification rule: %w", err))
@@ -323,7 +324,7 @@ func (ctrl *notificationRuleController) Snooze(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	existing, err := repositories.NotificationRuleRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find notification rule: %w", err))

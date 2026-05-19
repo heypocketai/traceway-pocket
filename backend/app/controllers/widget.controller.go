@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
@@ -58,7 +59,7 @@ func (c *widgetController) Add(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	group, err := repositories.WidgetGroupRepository.FindById(tx, groupId)
 	if err != nil {
@@ -135,7 +136,7 @@ func (c *widgetController) Update(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	group, err := repositories.WidgetGroupRepository.FindById(tx, groupId)
 	if err != nil {
@@ -203,7 +204,7 @@ func (c *widgetController) Move(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	group, err := repositories.WidgetGroupRepository.FindById(tx, groupId)
 	if err != nil {
@@ -284,7 +285,7 @@ func (c *widgetController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	group, err := repositories.WidgetGroupRepository.FindById(tx, groupId)
 	if err != nil {
@@ -335,7 +336,7 @@ func (c *widgetController) ToggleStar(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	group, err := repositories.WidgetGroupRepository.FindById(tx, groupId)
 	if err != nil {
@@ -375,7 +376,7 @@ func (c *widgetController) ListStarred(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	widgets, err := repositories.WidgetGroupRepository.FindStarredWidgetsByProject(tx, projectId)
 	if err != nil {

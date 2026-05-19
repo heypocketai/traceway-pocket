@@ -1,15 +1,13 @@
 package middleware
 
 import (
-	"github.com/tracewayapp/traceway/backend/app/db"
 	"context"
-	"database/sql"
 	"net/http"
+
+	"github.com/tracewayapp/traceway/backend/app/db"
 
 	"github.com/gin-gonic/gin"
 )
-
-const TransactionContextKey = "dbTx"
 
 func Transactional(c *gin.Context) {
 	txHandle, err := db.DB.Begin()
@@ -27,9 +25,9 @@ func Transactional(c *gin.Context) {
 		}
 	}()
 
-	c.Set(TransactionContextKey, txHandle)
+	c.Set(db.TransactionContextKey, txHandle)
 
-	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), TransactionContextKey, txHandle))
+	c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), db.TransactionContextKey, txHandle))
 
 	c.Next()
 
@@ -41,11 +39,4 @@ func Transactional(c *gin.Context) {
 	} else {
 		txHandle.Rollback()
 	}
-}
-
-func GetTx(c *gin.Context) *sql.Tx {
-	if id, exists := c.Get(TransactionContextKey); exists {
-		return id.(*sql.Tx)
-	}
-	return nil
 }

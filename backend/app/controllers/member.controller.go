@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
@@ -14,7 +15,7 @@ import (
 type memberController struct{}
 
 func (c *memberController) UpdateRole(ctx *gin.Context) {
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	currentUserId := middleware.GetUserId(ctx)
 	currentUserRole := middleware.GetUserOrgRole(ctx)
@@ -66,7 +67,7 @@ func (c *memberController) UpdateRole(ctx *gin.Context) {
 }
 
 func (c *memberController) RemoveMember(ctx *gin.Context) {
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	currentUserId := middleware.GetUserId(ctx)
 

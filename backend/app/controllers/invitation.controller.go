@@ -21,7 +21,7 @@ const maxMembersPerOrg = 10
 const invitationExpiryDays = 7
 
 func (c *invitationController) InviteUser(ctx *gin.Context) {
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 	userId := middleware.GetUserId(ctx)
 
@@ -109,7 +109,7 @@ func (c *invitationController) ListInvitations(ctx *gin.Context) {
 }
 
 func (c *invitationController) RevokeInvitation(ctx *gin.Context) {
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	organizationId := middleware.GetOrganizationId(ctx)
 
 	invitationId, err := strconv.Atoi(ctx.Param("id"))
@@ -213,7 +213,7 @@ func (c *invitationController) GetInvitationInfo(ctx *gin.Context) {
 }
 
 func (c *invitationController) AcceptInvitation(ctx *gin.Context) {
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	token := ctx.Param("token")
 
 	var request models.AcceptInvitationRequest
@@ -300,7 +300,7 @@ func (c *invitationController) AcceptInvitation(ctx *gin.Context) {
 }
 
 func (c *invitationController) AcceptExistingUser(ctx *gin.Context) {
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	token := ctx.Param("token")
 	userId := middleware.GetUserId(ctx)
 	userEmail := middleware.GetUserEmail(ctx)

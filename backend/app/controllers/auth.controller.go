@@ -3,6 +3,7 @@ package controllers
 import (
 	"github.com/tracewayapp/traceway/backend/app/cache"
 	"github.com/tracewayapp/traceway/backend/app/config"
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
@@ -19,7 +20,7 @@ var PostRegistrationHooks []func(tx *sql.Tx, org *models.Organization, user *mod
 type authController struct{}
 
 func (a authController) HasOrganizations(c *gin.Context) {
-	tx := middleware.GetTx(c)
+	tx := db.GetTx(c)
 	hasOrganizations, err := repositories.OrganizationRepository.HasOrganizations(tx)
 
 	if err != nil {
@@ -42,7 +43,7 @@ func (a authController) Login(c *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(c)
+	tx := db.GetTx(c)
 
 	user, err := repositories.UserRepository.FindByEmail(tx, request.Email)
 	if err != nil {
@@ -104,7 +105,7 @@ func (a authController) Register(c *gin.Context) {
 		}
 	}
 
-	tx := middleware.GetTx(c)
+	tx := db.GetTx(c)
 
 	// if we're not in the cloud mode only a single organization is allowed
 	if config.Config.CloudMode != "true" {
@@ -213,7 +214,7 @@ func (a authController) Register(c *gin.Context) {
 }
 
 func (a authController) LoginBundle(c *gin.Context) {
-	tx := middleware.GetTx(c)
+	tx := db.GetTx(c)
 
 	userId := middleware.GetUserId(c)
 	if userId == 0 {

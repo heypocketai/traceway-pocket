@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
@@ -26,7 +27,7 @@ func (c *widgetGroupController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	list, err := repositories.WidgetGroupRepository.FindByProject(tx, projectId)
 	if err != nil {
@@ -59,7 +60,7 @@ func (c *widgetGroupController) PopulateDefaults(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	existing, err := repositories.WidgetGroupRepository.FindByProject(tx, projectId)
 	if err != nil {
@@ -113,7 +114,7 @@ func (c *widgetGroupController) Create(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	existing, err := repositories.WidgetGroupRepository.FindByProject(tx, projectId)
 	if err != nil {
@@ -166,7 +167,7 @@ func (c *widgetGroupController) GetWithWidgets(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	group, err := repositories.WidgetGroupRepository.FindById(tx, id)
 	if err != nil {
@@ -225,7 +226,7 @@ func (c *widgetGroupController) Update(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	existing, err := repositories.WidgetGroupRepository.FindById(tx, id)
 	if err != nil {
@@ -275,7 +276,7 @@ func (c *widgetGroupController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	existing, err := repositories.WidgetGroupRepository.FindById(tx, id)
 	if err != nil {

@@ -87,7 +87,7 @@ type UpdateSettingsRequest struct {
 
 func (c *organizationController) UpdateSettings(ctx *gin.Context) {
 	organizationId := middleware.GetOrganizationId(ctx)
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	var req UpdateSettingsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

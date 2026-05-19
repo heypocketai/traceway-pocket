@@ -63,6 +63,14 @@ func GetDB() *sql.DB {
 	return DB
 }
 
+const TransactionContextKey = "dbTx"
+func GetTx(ctx context.Context) *sql.Tx {
+	if tx, ok := ctx.Value(TransactionContextKey).(*sql.Tx); ok {
+		return tx
+	}
+	return nil
+}
+
 type ctxKey struct{}
 
 func ContextWithTx(ctx context.Context, tx *sql.Tx) context.Context {

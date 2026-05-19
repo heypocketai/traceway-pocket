@@ -26,7 +26,7 @@ func (ctrl *notificationChannelController) List(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	channels, err := repositories.NotificationChannelRepository.FindByProject(tx, projectId)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to list notification channels: %w", err))
@@ -89,7 +89,7 @@ func (ctrl *notificationChannelController) Create(ctx *gin.Context) {
 		createdBy = &userId
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	now := time.Now().UTC()
 	channel := &models.NotificationChannel{
 		ProjectId:   projectId,
@@ -156,7 +156,7 @@ func (ctrl *notificationChannelController) Update(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	existing, err := repositories.NotificationChannelRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to find notification channel: %w", err))
@@ -194,7 +194,7 @@ func (ctrl *notificationChannelController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	existing, err := repositories.NotificationChannelRepository.FindById(tx, id)
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, traceway.NewStackTraceErrorf("failed to delete notification channel: %w", err))

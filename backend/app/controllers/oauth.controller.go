@@ -11,6 +11,7 @@ import (
 
 	"github.com/tracewayapp/traceway/backend/app/cache"
 	"github.com/tracewayapp/traceway/backend/app/config"
+	"github.com/tracewayapp/traceway/backend/app/db"
 	"github.com/tracewayapp/traceway/backend/app/middleware"
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
@@ -90,7 +91,7 @@ func (a oauthController) Callback(c *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(c)
+	tx := db.GetTx(c)
 
 	var mappedRole string
 	if provider == "oidc" && services.OAuthService.OIDCRoleClaimEnabled() {
@@ -148,7 +149,7 @@ func (a oauthController) Callback(c *gin.Context) {
 }
 
 func (a oauthController) findOrCreateUser(c *gin.Context, provider string, gothUser goth.User) (*models.User, error) {
-	tracewayTx := middleware.GetTx(c)
+	tracewayTx := db.GetTx(c)
 
 	user, err := repositories.UserRepository.FindByOAuth(tracewayTx, provider, gothUser.UserID)
 	if err != nil {
@@ -221,7 +222,7 @@ func (a oauthController) FinishSetup(c *gin.Context) {
 		return
 	}
 
-	tx := middleware.GetTx(c)
+	tx := db.GetTx(c)
 
 	user, err := repositories.UserRepository.FindById(tx, userId)
 	if err != nil {

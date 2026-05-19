@@ -1,9 +1,8 @@
 package controllers
 
 import (
-	"github.com/tracewayapp/traceway/backend/app/middleware"
-	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/db"
+	"github.com/tracewayapp/traceway/backend/app/models"
 	"github.com/tracewayapp/traceway/backend/app/repositories"
 	"github.com/tracewayapp/traceway/backend/app/services"
 	"database/sql"
@@ -21,7 +20,7 @@ const resetTokenExpiry = 1 * time.Hour
 const resetRateLimitPeriod = 1 * time.Hour
 
 func (c *passwordResetController) ForgotPassword(ctx *gin.Context) {
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 
 	var request models.ForgotPasswordRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
@@ -88,7 +87,7 @@ func (c *passwordResetController) ValidateToken(ctx *gin.Context) {
 }
 
 func (c *passwordResetController) ResetPassword(ctx *gin.Context) {
-	tx := middleware.GetTx(ctx)
+	tx := db.GetTx(ctx)
 	token := ctx.Param("token")
 
 	var request models.ResetPasswordRequest
