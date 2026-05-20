@@ -53,7 +53,6 @@
 	} from '$lib/utils/framework-code';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
-	import type { Component } from 'svelte';
 
 	const timezone = $derived(getTimezone());
 
@@ -106,23 +105,6 @@
 	let loading = $state(true);
 	let error = $state('');
 	let errorStatus = $state<number>(0);
-	let PlanLimitBanner = $state<Component<{ organizationId: number }> | null>(null);
-
-	async function loadPlanLimitBanner() {
-		try {
-			// @ts-ignore - $billing alias only exists when billing extension is available
-			const module = await import('$billing/plan-limit-banner.svelte');
-			PlanLimitBanner = module.default;
-		} catch {
-			// Billing extension not available - this is expected for open source builds
-		}
-	}
-
-	$effect(() => {
-		loadPlanLimitBanner();
-	});
-
-	const bannerOrganizationId = $derived(projectsState.currentProject?.organizationId ?? null);
 
 	const STARRED_WINDOW_MS = 24 * 60 * 60 * 1000;
 	let starredFromUTC = $state(new Date(Date.now() - STARRED_WINDOW_MS).toISOString());
@@ -368,10 +350,6 @@ service:
 </script>
 
 <div class="space-y-4">
-	{#if PlanLimitBanner && bannerOrganizationId !== null}
-		<PlanLimitBanner organizationId={bannerOrganizationId} />
-	{/if}
-
 	{#if error && !loading}
 		<ErrorDisplay
 			status={errorStatus === 404

@@ -20,6 +20,7 @@
 	import { setupTraceway } from '@tracewayapp/svelte';
 	import { captureException } from '@tracewayapp/frontend';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import type { Component } from 'svelte';
 
 	if (__TRACEWAY_URL__) {
 		setupTraceway({
@@ -30,6 +31,9 @@
 	let { children } = $props();
 	let showAddProjectModal = $state(false);
 	let showEditProjectModal = $state(false);
+	let CrossSiteNotificationBanner = $state<Component<{ organizationId: number }> | null>(null);
+
+	const bannerOrganizationId = $derived(projectsState.currentProject?.organizationId ?? null);
 
 	// Track navigation depth for smart back buttons
 	let lastPathname = '';
@@ -56,6 +60,14 @@
 		if (authState.isAuthenticated) {
 			projectsState.loadProjects();
 		}
+
+		import('$billing/cross-site-notification-baner.svelte')
+			.then((module) => {
+				CrossSiteNotificationBanner = module.default;
+			})
+			.catch(() => {
+				// Billing extension not available - expected for open source builds
+			});
 	});
 
 	function handleLogout() {
@@ -166,6 +178,11 @@
 				</div>
 			</header>
 			<main class="min-w-0 flex-1 p-4">
+				{#if CrossSiteNotificationBanner && bannerOrganizationId !== null}
+					<div class="mb-4">
+						<CrossSiteNotificationBanner organizationId={bannerOrganizationId} />
+					</div>
+				{/if}
 				{@render children()}
 			</main>
 		</Sidebar.SidebarInset>
