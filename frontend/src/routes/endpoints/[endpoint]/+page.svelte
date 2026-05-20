@@ -28,6 +28,8 @@
 	import PageHeader from '$lib/components/issues/page-header.svelte';
 	import { Input } from '$lib/components/ui/input';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Badge } from '$lib/components/ui/badge';
 	import { toast } from 'svelte-sonner';
 	import { resolve } from '$app/paths';
 	import {
@@ -70,6 +72,7 @@
 		apdex: number;
 		errorRate: number;
 		throughput: number;
+		isStream?: boolean;
 	};
 
 	type SortField = 'recorded_at' | 'duration' | 'status_code' | 'body_size';
@@ -361,13 +364,28 @@
 				title={decodeURIComponent(data.endpoint)}
 				subtitle="Trace instances for this endpoint"
 				onBack={goBackToEndpoints}
-			/>
+			>
+				{#snippet trailing()}
+					{#if stats?.isStream}
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								<Badge variant="outline" class="font-sans">Stream</Badge>
+							</Tooltip.Trigger>
+							<Tooltip.Content side="bottom" class="max-w-xs">
+								Streaming endpoint — latency metrics aren't tracked.
+							</Tooltip.Content>
+						</Tooltip.Root>
+					{/if}
+				{/snippet}
+			</PageHeader>
 
 			<div class="flex items-start gap-2">
-				<Button variant="outline" size="sm" onclick={() => { offsetInput = offsetMs > 0 ? String(offsetMs) : ''; reasonInput = reason; showSlowDialog = true; }}>
-					<Snail class="h-4 w-4" />
-					{offsetMs > 0 ? `+${offsetMs}ms offset` : 'Expected Performance'}
-				</Button>
+				{#if !stats?.isStream}
+					<Button variant="outline" size="sm" onclick={() => { offsetInput = offsetMs > 0 ? String(offsetMs) : ''; reasonInput = reason; showSlowDialog = true; }}>
+						<Snail class="h-4 w-4" />
+						{offsetMs > 0 ? `+${offsetMs}ms offset` : 'Expected Performance'}
+					</Button>
+				{/if}
 				<TimeRangePicker
 					bind:fromDate
 					bind:toDate
@@ -379,7 +397,7 @@
 			</div>
 		</div>
 
-		{#if offsetMs > 0}
+		{#if offsetMs > 0 && !stats?.isStream}
 			<div class="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-4 py-3 text-sm">
 				<Snail class="h-4 w-4 shrink-0 text-muted-foreground" />
 				<span>
@@ -393,38 +411,55 @@
 
 		<!-- Endpoint Stats -->
 		{#if stats}
-			<div class="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
-				<div class="space-y-1">
-					<p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.avgDuration)}</p>
-					<p class="text-xs text-muted-foreground">Average response time</p>
+			{#if stats.isStream}
+				<div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-3">
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{stats.count.toLocaleString()}</p>
+						<p class="text-xs text-muted-foreground">Connections</p>
+					</div>
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{stats.errorRate.toFixed(2)} %</p>
+						<p class="text-xs text-muted-foreground">Average error rate</p>
+					</div>
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{stats.throughput.toFixed(0)} rpm</p>
+						<p class="text-xs text-muted-foreground">Average throughput</p>
+					</div>
 				</div>
-				<div class="space-y-1">
-					<p class="text-2xl font-semibold tracking-tight">
-						{formatDurationMs(stats.medianDuration)}
-					</p>
-					<p class="text-xs text-muted-foreground">Median response time</p>
+			{:else}
+				<div class="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-7">
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.avgDuration)}</p>
+						<p class="text-xs text-muted-foreground">Average response time</p>
+					</div>
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">
+							{formatDurationMs(stats.medianDuration)}
+						</p>
+						<p class="text-xs text-muted-foreground">Median response time</p>
+					</div>
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.p95Duration)}</p>
+						<p class="text-xs text-muted-foreground">95th percentile response time</p>
+					</div>
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.p99Duration)}</p>
+						<p class="text-xs text-muted-foreground">99th percentile response time</p>
+					</div>
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{stats.apdex.toFixed(2)}</p>
+						<p class="text-xs text-muted-foreground">Apdex score</p>
+					</div>
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{stats.errorRate.toFixed(2)} %</p>
+						<p class="text-xs text-muted-foreground">Average error rate</p>
+					</div>
+					<div class="space-y-1">
+						<p class="text-2xl font-semibold tracking-tight">{stats.throughput.toFixed(0)} rpm</p>
+						<p class="text-xs text-muted-foreground">Average throughput</p>
+					</div>
 				</div>
-				<div class="space-y-1">
-					<p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.p95Duration)}</p>
-					<p class="text-xs text-muted-foreground">95th percentile response time</p>
-				</div>
-				<div class="space-y-1">
-					<p class="text-2xl font-semibold tracking-tight">{formatDurationMs(stats.p99Duration)}</p>
-					<p class="text-xs text-muted-foreground">99th percentile response time</p>
-				</div>
-				<div class="space-y-1">
-					<p class="text-2xl font-semibold tracking-tight">{stats.apdex.toFixed(2)}</p>
-					<p class="text-xs text-muted-foreground">Apdex score</p>
-				</div>
-				<div class="space-y-1">
-					<p class="text-2xl font-semibold tracking-tight">{stats.errorRate.toFixed(2)} %</p>
-					<p class="text-xs text-muted-foreground">Average error rate</p>
-				</div>
-				<div class="space-y-1">
-					<p class="text-2xl font-semibold tracking-tight">{stats.throughput.toFixed(0)} rpm</p>
-					<p class="text-xs text-muted-foreground">Average throughput</p>
-				</div>
-			</div>
+			{/if}
 		{:else if loading}
 			<div class="flex items-center justify-center py-8">
 				<LoadingCircle size="lg" />

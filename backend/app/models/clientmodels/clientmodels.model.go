@@ -99,6 +99,8 @@ type ClientTrace struct {
 	DistributedTraceId string            `json:"distributedTraceId"`
 }
 
+const streamAttributeKey = "traceway.is_stream"
+
 // ParsedId returns the trace ID as uuid.UUID
 func (c *ClientTrace) ParsedId() uuid.UUID {
 	if parsed, err := uuid.Parse(c.Id); err == nil {
@@ -130,6 +132,7 @@ func (c *ClientTrace) ToEndpoint(appVersion, serverName string) models.Endpoint 
 		AppVersion:         appVersion,
 		ServerName:         serverName,
 		DistributedTraceId: c.parsedDistributedTraceId(),
+		IsStream:           c.Attributes[streamAttributeKey] == "true",
 	}
 }
 
