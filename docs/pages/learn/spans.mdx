@@ -1,44 +1,44 @@
 # Spans
 
-Spans are timed sub-operations within a trace. They show where time is spent during request processing or background task execution.
+Spans are the underlying primitive Traceway stores. Everything else — Endpoints, Tasks, AI Traces, Issues — is a [materialized view](/learn/traces#spans-are-the-primitive) derived from the spans you ingest. The shape is OpenTelemetry-native, so your existing OTel instrumentation works without translation.
 
-## What Spans Capture
+## What a span captures
 
-Each span records:
+| Field | Description |
+| --- | --- |
+| `span_id` | 8-byte OTel span id, stored as the low 8 bytes of a UUID |
+| `trace_id` | The id of the owning entity (endpoint, task, or ai_trace) — see "Owning entity" below |
+| `parent_span_id` | The span's direct parent within the trace, if any |
+| `name` | Descriptive label (`db.users.find`, `POST https://api.stripe.com/v1/charges`, etc.) |
+| `kind` | One of OTel's `SERVER`, `CLIENT`, `INTERNAL`, `PRODUCER`, `CONSUMER` |
+| `start_time` / `duration` | When it started and how long it ran |
+| `attributes` | Arbitrary key-value metadata (HTTP, DB, AI, custom) |
+| `events` | Timestamped events on the span — `"exception"` events become [Issues](/learn/issues) |
 
-| Field      | Description                          |
-| ---------- | ------------------------------------ |
-| ID         | Unique span identifier               |
-| Name       | Descriptive name you provide         |
-| Start Time | When the span started                |
-| Duration   | Time elapsed (calculated on `End()`) |
+## Owning entity, not OTel trace id
 
-## Use Cases
+Each row in the `spans` table carries a `trace_id` column — but in Traceway it points to the **owning entity** (an endpoint, task, or ai_trace id), not the raw OTel trace id. This is what makes the waterfall view cheap:
 
-Spans are useful for timing:
+- "Show me the children of this endpoint" is a single indexed read on `spans.trace_id = <endpoint.id>`.
+- The full cross-process trace is still reachable via the entity's `distributed_trace_id`, which equals the OTel trace id.
 
-- Database queries
-- External API calls
+Re-rooting happens at ingestion. When a non-root entity (e.g. a CONSUMER task) is promoted, its descendant spans get the task's id as their `trace_id`. Sibling spans under the originating endpoint keep the endpoint's id. So a single OTel trace that produced an endpoint + a task ends up with two clean waterfalls — one rooted at the endpoint, one at the task — joinable through `distributed_trace_id`.
+
+## What spans are good for
+
+Spans tell you **where the time went**. If an endpoint takes 500ms and 450ms of that is in a `db.users.find` span, you know what to optimize. The dashboard's drill-down — Endpoints / Tasks / AI Traces → instance → waterfall — bottoms out in spans.
+
+Common things to wrap in a span:
+
+- Database queries (auto-instrumented in most stacks)
+- External HTTP calls (`http.client` auto-instrumentation)
 - Cache operations
 - File I/O
-- Business logic steps
+- Business-logic steps you want to time
 
-## Viewing Spans
+## Naming
 
-In the dashboard:
-
-1. Navigate to the **Endpoints** or **Tasks** page
-2. Click on an entry to see its details
-3. Individual traces show their spans as a timeline
-4. Each span displays its name and duration
-
-<img src="/spans.png" alt="Spans Timeline" style={{ maxWidth: '100%', height: 'auto', marginTop: '16px', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
-
-This helps identify bottlenecks — if a request takes 500ms and 450ms is in a database span, you know where to optimize.
-
-## Naming Conventions
-
-Use hierarchical, descriptive names for easy filtering:
+Hierarchical names group well in the dashboard's filters:
 
 ```
 db.users.find
@@ -49,15 +49,21 @@ cache.redis.get
 logic.pricing.calculate
 ```
 
-The pattern `category.resource.action` keeps span names consistent and searchable across your codebase.
+`category.resource.action` is a useful default — pick something and stay consistent.
 
 ## Nesting
 
-Spans can not be nested. The nesting is achieved purely by the start time of the child spans:
+In Traceway's storage, span nesting is reconstructed from `parent_span_id`. The waterfall view renders children indented under their parent in chronological order, exactly the way the OTel spec defines a trace tree.
 
 ```
-Total: 200ms
-├── process.checkout.validate: 20ms to 150ms
-├── process.checkout.charge: 150ms to 160ms
-└── process.checkout.fulfill: 160ms to 200ms
+endpoint POST /api/checkout: 200ms
+├── validate.cart           20ms
+├── pricing.calculate       80ms
+│   └── db.products.batch    40ms
+├── stripe.charge           60ms
+└── db.orders.insert        30ms
 ```
+
+## Manual spans
+
+The Traceway SDKs and any standard OTel SDK can create spans manually. See the per-framework client docs for the exact API; the underlying shape is always the same OTel span model described above.
