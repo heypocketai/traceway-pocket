@@ -64,6 +64,10 @@ jobs:
       - name: Fetch existing index
         run: |
           curl -sf https://charts.tracewayapp.com/index.yaml -o existing-index.yaml || true
+          if [ -f existing-index.yaml ] && ! head -n 1 existing-index.yaml | grep -q '^apiVersion:'; then
+            echo "Fetched existing-index.yaml is not a Helm index (likely Cloudflare SPA fallback HTML) — discarding."
+            rm -f existing-index.yaml
+          fi
 
       - name: Generate index.yaml
         run: |
