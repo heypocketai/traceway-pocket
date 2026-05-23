@@ -69,8 +69,10 @@ func openSQLite(path string, telemetry bool) (*sql.DB, error) {
 		if telemetry {
 			params = append(params,
 				"_pragma=synchronous(NORMAL)",
-				"_pragma=cache_size(-65536)",
+				"_pragma=cache_size(-524288)",
 				"_pragma=temp_store(MEMORY)",
+				"_pragma=mmap_size(1073741824)",
+				"_pragma=wal_autocheckpoint(50000)",
 			)
 		} else {
 			params = append(params, "_pragma=foreign_keys(ON)")
