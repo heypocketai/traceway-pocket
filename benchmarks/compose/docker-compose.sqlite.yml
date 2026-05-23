@@ -12,7 +12,7 @@ services:
       GIN_MODE: "release"
     volumes:
       - traceway-bench-sqlite-data:/data
-    restart: "no"
+    restart: on-failure:3
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost/health"]
       interval: 5s
