@@ -62,14 +62,20 @@ func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) e
 		return nil
 	}
 
+	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	for _, s := range spans {
 		row := spanToRow(s)
-		if err := lit.InsertExistingUuid(db.TelemetryDB, &row); err != nil {
+		if err := lit.InsertExistingUuid(tx, &row); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (r *spanRepository) FindByTraceId(ctx context.Context, projectId, traceId uuid.UUID) ([]models.Span, error) {

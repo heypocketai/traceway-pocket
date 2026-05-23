@@ -37,6 +37,12 @@ func (r *metricPointRepository) InsertAsync(ctx context.Context, points []models
 		return nil
 	}
 
+	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	for _, p := range points {
 		tags := NewSQLiteJSONMap(p.Tags)
 		tagsVal, _ := tags.Value()
@@ -52,12 +58,12 @@ func (r *metricPointRepository) InsertAsync(ctx context.Context, points []models
 		if err != nil {
 			return err
 		}
-		if _, err := db.TelemetryDB.ExecContext(ctx, query, args...); err != nil {
+		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (r *metricPointRepository) QueryTimeSeries(ctx context.Context, projectId uuid.UUID, name string, from, to time.Time, intervalMinutes int, aggregation string, tagFilters map[string]string, groupBy string) (map[string][]models.TimeSeriesPoint, error) {

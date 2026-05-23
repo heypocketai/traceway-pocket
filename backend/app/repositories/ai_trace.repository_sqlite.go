@@ -150,13 +150,20 @@ func (r *aiTraceRepository) InsertAsync(ctx context.Context, lines []models.AiTr
 	if len(lines) == 0 {
 		return nil
 	}
+
+	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	for _, t := range lines {
 		row := aiTraceToRow(t)
-		if err := lit.InsertExistingUuid(db.TelemetryDB, &row); err != nil {
+		if err := lit.InsertExistingUuid(tx, &row); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *aiTraceRepository) FindGroupedByTraceName(ctx context.Context, projectId uuid.UUID, fromDate, toDate time.Time, page, pageSize int, orderBy, sortDirection, search, rootFilter string) ([]models.AiTraceStats, int64, error) {

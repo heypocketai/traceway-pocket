@@ -123,13 +123,20 @@ func (r *logRecordRepository) InsertAsync(ctx context.Context, records []models.
 	if len(records) == 0 {
 		return nil
 	}
+
+	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	for _, lr := range records {
 		row := logRecordToRow(lr)
-		if err := lit.InsertExistingUuid(db.TelemetryDB, &row); err != nil {
+		if err := lit.InsertExistingUuid(tx, &row); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *logRecordRepository) Search(ctx context.Context, params LogSearchParams) ([]models.LogRecord, int64, error) {

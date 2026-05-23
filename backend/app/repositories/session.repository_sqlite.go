@@ -95,6 +95,13 @@ func (r *sessionRepository) Upsert(ctx context.Context, sessions []models.Sessio
 			app_version = excluded.app_version,
 			server_name = excluded.server_name,
 			distributed_trace_id = excluded.distributed_trace_id`
+
+	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	for _, s := range sessions {
 		row := sessionToRow(s)
 		attrs, err := row.Attributes.Value()
@@ -113,14 +120,14 @@ func (r *sessionRepository) Upsert(ctx context.Context, sessions []models.Sessio
 		if err != nil {
 			return err
 		}
-		if _, err := db.TelemetryDB.ExecContext(ctx, stmt,
+		if _, err := tx.ExecContext(ctx, stmt,
 			row.Id, row.ProjectId, startedAt, endedAt, row.Duration,
 			row.ClientIP, attrs, row.AppVersion, row.ServerName, row.DistributedTraceId,
 		); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 func (r *sessionRepository) CountBetween(ctx context.Context, projectId uuid.UUID, start, end time.Time) (int64, error) {

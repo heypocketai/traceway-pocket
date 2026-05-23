@@ -157,14 +157,20 @@ func (e *endpointRepository) InsertAsync(ctx context.Context, lines []models.End
 		return nil
 	}
 
+	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	for _, ep := range lines {
 		row := endpointToRow(ep)
-		if err := lit.InsertExistingUuid(db.TelemetryDB, &row); err != nil {
+		if err := lit.InsertExistingUuid(tx, &row); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (e *endpointRepository) CountBetween(ctx context.Context, projectId uuid.UUID, start, end time.Time) (int64, error) {

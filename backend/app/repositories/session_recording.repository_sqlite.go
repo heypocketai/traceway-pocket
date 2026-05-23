@@ -36,6 +36,12 @@ func (r *sessionRecordingRepository) InsertAsync(ctx context.Context, recordings
 		return nil
 	}
 
+	tx, err := db.TelemetryDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	for _, rec := range recordings {
 		row := sessionRecording{
 			Id:           rec.Id,
@@ -46,12 +52,12 @@ func (r *sessionRecordingRepository) InsertAsync(ctx context.Context, recordings
 			FilePath:     rec.FilePath,
 			RecordedAt:   NewSQLiteTime(rec.RecordedAt),
 		}
-		if err := lit.InsertExistingUuid(db.TelemetryDB, &row); err != nil {
+		if err := lit.InsertExistingUuid(tx, &row); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 func (r *sessionRecordingRepository) FindByExceptionId(ctx context.Context, projectId uuid.UUID, exceptionId uuid.UUID) (string, error) {
