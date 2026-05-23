@@ -87,6 +87,15 @@ if [[ "${SMOKE}" == "smoke" ]]; then
     fi
 fi
 
+# SQLite has no merge-idle equivalent — /health/deep returns chReachable=false
+# and waitForMergesIdle skips immediately. Compensate with a longer per-step
+# drain and a fixed inter-phase cooldown so the SUT can finish digesting
+# Phase 1's wake (zombie goroutines + WAL checkpoint) before Phase 2 starts.
+# Without this, Phase 1 step-cliff contaminates Phase 2's first step.
+if [[ "${MODE}" == "sqlite" && "${SCENARIO}" == "throughput" && "${SMOKE}" != "smoke" ]]; then
+    extra_args+=( --step-drain-seconds 60s --inter-phase-cooldown-seconds 60s )
+fi
+
 OUT_PATH="${OUT_DIR}/${TIER}-${MODE}-${SIGNAL}-${SCENARIO}${async_suffix}.json"
 "${SCRIPT_DIR}/loadgen-bootstrap.sh" \
     "${LOADGEN_PUBLIC_IP}" \
