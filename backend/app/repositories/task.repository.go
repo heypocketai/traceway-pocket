@@ -11,14 +11,13 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 )
 
 type taskRepository struct{}
 
 func (e *taskRepository) InsertAsync(ctx context.Context, lines []models.Task) error {
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO tasks (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_root)")
+	batch, err := chdb.Conn.PrepareBatch(chdb.BatchCtx(), "INSERT INTO tasks (id, project_id, task_name, duration, recorded_at, client_ip, attributes, app_version, server_name, distributed_trace_id, span_id, is_root)")
 	if err != nil {
 		return err
 	}

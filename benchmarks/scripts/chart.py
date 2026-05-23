@@ -204,6 +204,26 @@ def phase1_p99_at_batch(run: dict, batch_size: int) -> float | None:
     return None
 
 
+def worst_phase_for_run(run: dict) -> str | None:
+    """Pick the phase that produced the lowest passing actualItemsPerSec, or the
+    phase that first failed. Used by the CH-pressure chart so the visualisation
+    targets the phase where the SUT actually struggled."""
+    failing = first_failure(run)
+    if failing:
+        return failing[0]
+    worst_phase = None
+    worst_value = float("inf")
+    for phase_key in ("phase1", "phase2", "phase3"):
+        for step in phase_steps(run, phase_key):
+            if not step.get("passed"):
+                continue
+            actual = step.get("actualItemsPerSec", 0) or 0
+            if actual < worst_value:
+                worst_value = actual
+                worst_phase = phase_key
+    return worst_phase
+
+
 # ---------- Throughput charts ----------
 
 
@@ -226,6 +246,7 @@ def render_headline_bar(runs: list[dict], signal: str, out: Path) -> None:
     width = 0.8 / max(len(modes_present), 1)
     x_centers = list(range(len(tiers_present)))
 
+    any_ch_restart = False
     for mi, mode in enumerate(modes_present):
         for ti, tier in enumerate(tiers_present):
             match = [r for r in sig_runs if r["tier"] == tier and r["mode"] == mode]
@@ -234,14 +255,22 @@ def render_headline_bar(runs: list[dict], signal: str, out: Path) -> None:
                 continue
             run = match[0]
             value = run.get("maxSustainableItemsPerSec", 0) or 0
+            ch_restart = bool(run.get("chRestarted"))
+            if ch_restart:
+                any_ch_restart = True
             if value > 0:
-                ax.bar(x, value, width=width, color=mode_color(mode))
+                bar_kwargs = {"width": width, "color": mode_color(mode)}
+                if ch_restart:
+                    bar_kwargs.update({"edgecolor": "#aa3333", "hatch": "xx", "linewidth": 1.2})
+                ax.bar(x, value, **bar_kwargs)
                 src = headline_source(run)
                 phase_tag = f" ({PHASE_LABEL[src[0]]})" if src else ""
+                restart_tag = " CH↻" if ch_restart else ""
                 ax.annotate(
-                    f"{int(value):,}{phase_tag}",
+                    f"{int(value):,}{phase_tag}{restart_tag}",
                     xy=(x, value), xytext=(0, 4), textcoords="offset points",
                     ha="center", va="bottom", fontsize=8,
+                    color="#aa3333" if ch_restart else "black",
                 )
             else:
                 ax.bar(x, ghost_height, width=width, color="#dddddd",
@@ -267,6 +296,8 @@ def render_headline_bar(runs: list[dict], signal: str, out: Path) -> None:
 
     legend_handles = [Patch(facecolor=mode_color(m), label=m) for m in modes_present]
     legend_handles.append(Patch(facecolor="#dddddd", edgecolor="#999999", hatch="///", label="all phases failed"))
+    if any_ch_restart:
+        legend_handles.append(Patch(facecolor="white", edgecolor="#aa3333", hatch="xx", label="CH restart during run (result invalid)"))
     ax.legend(handles=legend_handles, title="DB mode", loc="upper left")
 
     ax.grid(axis="y", linestyle=":", alpha=0.4)
@@ -712,6 +743,70 @@ def render_batch_efficiency(runs: list[dict], signal: str, out: Path) -> None:
     ax.legend(loc="upper left", fontsize=9)
     fig.tight_layout()
     fig.savefig(out, dpi=130)
+    plt.close(fig)
+
+
+def render_ch_pressure(runs: list[dict], signal: str, out: Path) -> None:
+    """For each (tier, mode) of a signal, plot CH parts count and active merges
+    across the steps of its worst-performing phase. Makes the CH-side story —
+    "parts piled up before the cliff" or "merges were idle and the cliff was
+    backend-side" — visible at a glance."""
+    sig_runs = iter_runs(runs, signal, "throughput")
+    sig_runs = [r for r in sig_runs if any(
+        (step.get("ch") or {}).get("reachable")
+        for phase_key in ("phase1", "phase2", "phase3")
+        for step in phase_steps(r, phase_key)
+    )]
+    if not sig_runs:
+        return
+
+    cols = min(len(sig_runs), 3)
+    rows = (len(sig_runs) + cols - 1) // cols
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 5.5, rows * 3.5), squeeze=False)
+
+    for idx, run in enumerate(sig_runs):
+        r, c = divmod(idx, cols)
+        ax_parts = axes[r][c]
+        ax_merges = ax_parts.twinx()
+
+        phase_key = worst_phase_for_run(run)
+        if not phase_key:
+            ax_parts.set_visible(False)
+            ax_merges.set_visible(False)
+            continue
+        steps = phase_steps(run, phase_key)
+        if not steps:
+            ax_parts.set_visible(False)
+            ax_merges.set_visible(False)
+            continue
+
+        xs = [s.get("step", i + 1) for i, s in enumerate(steps)]
+        parts = [(s.get("ch") or {}).get("partsCount", 0) for s in steps]
+        merges = [(s.get("ch") or {}).get("activeMerges", 0) for s in steps]
+        first_failed_step = next((s.get("step") for s in steps if not s.get("passed")), None)
+
+        ax_parts.plot(xs, parts, marker="o", color="#1f77b4", label="parts")
+        ax_merges.plot(xs, merges, marker="s", color="#d62728", linestyle="--", label="active merges")
+
+        if first_failed_step is not None:
+            ax_parts.axvline(first_failed_step, color="#aa3333", linestyle=":", alpha=0.6)
+
+        title = f"{run_label(run)} — {PHASE_LABEL[phase_key]}"
+        if run.get("chRestarted"):
+            title += " (CH↻)"
+        ax_parts.set_title(title, fontsize=10)
+        ax_parts.set_xlabel("step")
+        ax_parts.set_ylabel("parts (total, active)", color="#1f77b4")
+        ax_merges.set_ylabel("active merges", color="#d62728")
+        ax_parts.grid(True, linestyle=":", alpha=0.4)
+
+    for idx in range(len(sig_runs), rows * cols):
+        r, c = divmod(idx, cols)
+        axes[r][c].set_visible(False)
+
+    fig.suptitle(f"ClickHouse pressure during the worst-performing phase — {signal}", y=1.02)
+    fig.tight_layout()
+    fig.savefig(out, dpi=130, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -1213,6 +1308,7 @@ def main() -> int:
         render_tier_scaling(runs, signal, results_dir / f"chart-tier-scaling-{signal}.png")
         render_cliff_grid(runs, signal, results_dir / f"chart-cliff-{signal}.png")
         render_batch_efficiency(runs, signal, results_dir / f"chart-batch-efficiency-{signal}.png")
+        render_ch_pressure(runs, signal, results_dir / f"chart-ch-pressure-{signal}.png")
 
         # Read-probe charts (no-op if no read-probe runs for this signal)
         render_readprobe_headline(runs, signal, results_dir / f"chart-readprobe-headline-{signal}.png")

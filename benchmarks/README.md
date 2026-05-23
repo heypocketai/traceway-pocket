@@ -52,6 +52,58 @@ other. Each folder is wiped on each dispatch of its scenario.
 Don't read the throughput number as "the dashboard stays usable at N
 items/sec" — that's what read-probe is for.
 
+## Two insert paths: sync vs async ClickHouse
+
+Every backend `PrepareBatch` call funnels through `chdb.BatchCtx()`, which
+reads `CH_ASYNC_INSERT` once at startup. **This is a per-dispatch toggle**
+— a single matrix entry runs one insert mode; comparison requires two
+dispatches.
+
+|                          | `CH_ASYNC_INSERT=0` (default) | `CH_ASYNC_INSERT=1` |
+|--------------------------|-------------------------------|----------------------|
+| Driver flag              | `clickhouse.WithAsync(false)` | `clickhouse.WithAsync(true)` |
+| Part-per-request         | 1 part per insert (worst case for MergeTree) | Batched server-side, parts amortised |
+| What it measures         | Pessimistic ceiling — what you get if you point a stock OTel collector at the default Traceway config | Realistic production ceiling — what a tuned deployment gets |
+| Result filename          | `<tier>-<mode>-<signal>-<scenario>.json` | `<tier>-<mode>-<signal>-<scenario>-async.json` |
+| Headline bar in charts   | Solid | Solid (sibling bar in chart-headline-<signal>.png when both passes are present) |
+
+Quote both numbers when reporting. The sync number tells you the floor your
+users hit before tuning; the async number tells you the headroom.
+
+**Triggering async-insert locally:**
+
+```bash
+# Default (sync) — no env var needed
+./benchmarks/scripts/run-local.sh --tier ccx13 --mode pgch --signal spans
+
+# Async — set CH_ASYNC_INSERT=1 in the parent env. run-matrix-entry.sh
+# propagates it via the 7th positional arg "async" to sut-bootstrap.sh,
+# which exports it into the SUT's docker-compose env so chdb.BatchCtx()
+# reads the right value at startup.
+CH_ASYNC_INSERT=1 ./benchmarks/scripts/run-local.sh --tier ccx13 --mode pgch --signal spans --async
+```
+
+`run-local.sh --async` is sugar that just sets `CH_ASYNC_INSERT=1` and
+threads the `async` arg into `run-matrix-entry.sh`. Direct script call:
+
+```bash
+./benchmarks/scripts/run-matrix-entry.sh ccx13 pgch spans 30m benchmarks/results-throughput "" async
+#                                         ^tier ^mode ^sig ^dur ^out-dir            ^smoke ^async
+```
+
+**Triggering async-insert in CI:**
+
+In the GitHub Actions `workflow_dispatch` form, flip the `async_insert`
+boolean to `true`. The workflow propagates it through to
+`run-matrix-entry.sh` and tags both the artifact and the committed JSON
+filenames with `-async`. Dispatch twice (once off, once on) and the
+aggregate job's chart renderer paints sibling bars in
+`chart-headline-<signal>.png`.
+
+`managed-ch` mode also honours `CH_ASYNC_INSERT` — useful for measuring
+how much of the managed offering's headroom is currently being left on
+the table by the conservative sync default.
+
 ## How a run works
 
 Per matrix entry (one tier × one mode × one signal):
@@ -64,17 +116,26 @@ Per matrix entry (one tier × one mode × one signal):
 4. `loadgen-bootstrap.sh` cross-compiles the loadgen, pushes it to the
    loadgen box, runs it with `--signal <spans|metrics|logs>` against the
    SUT's *private* IP.
-5. The loadgen runs a three-phase ramp:
+5. The loadgen runs a three-phase ramp. After every step it GETs
+   `/api/health/deep` and embeds a `ch` block in the step's JSON
+   (`partsCount`, `partsByTable`, `activeMerges`, `longestMergeSec`,
+   `errorsRecent`, `memoryUsageBytes`, `uptimeSec`). This is how the
+   bench sees ClickHouse-side pressure — the HTTP-only signal alone
+   can't distinguish "SUT cliffed on CPU" from "MergeTree threw
+   `Too many parts`".
    - **Phase 1 — batch-size ramp.** Single client at a fixed 5 req/sec.
      Batch sizes step through `256,1024,4096,8192,16384`. Each step holds for
      `--step-duration` (default 2 min). Stops at the first failing step.
-   - **Inter-phase cooldown.** Phase 1's last step typically runs the SUT
-     near saturation; the loadgen sleeps `--inter-phase-cooldown-seconds`
-     (default 30 s) before starting Phase 2 so the SUT can drain its
-     queues (CH merges, PG WAL, HTTP handler pool). Without this pause,
-     pgch runs reliably produced "0 OK / 0 errors" Phase 2 because new
-     requests sat on the SUT-side TCP backlog while the SUT was still
-     digesting Phase 1's final wave.
+   - **Inter-phase merge-idle wait.** Phase 1's last step typically runs the
+     SUT near saturation; CH merge horizons are minutes, not seconds. The
+     loadgen polls `/api/health/deep` every 5 s until `activeMerges == 0`
+     and `partsCount` is stable (within ±5%) for two consecutive polls, or
+     `--max-merge-idle-wait` (default 5 m) expires. The old fixed
+     `--inter-phase-cooldown-seconds` flag still works (additive pre-wait)
+     but defaults to 0 — it's deprecated in favour of polling CH directly.
+     Without this gate, pgch runs reliably produced "0 OK / 0 errors"
+     Phase 2 because new requests sat on the SUT-side TCP backlog while
+     CH was still merging Phase 1's parts.
    - **Phase 2 — request-rate ramp (collector shape).** Batch size fixed at
      `min(Phase 1 winner, --phase2-batch-cap=16384)`. Request rates step
      through `1,5,25,100,400`. When the coarse ramp finds the first failing
@@ -83,7 +144,7 @@ Per matrix entry (one tier × one mode × one signal):
      within `--phase2-bisect-tolerance` (default 20%). So `5→25` (a 5× jump)
      gets refined into something like `5, 15, 10, 12` until the gap is
      <20% of the last passing rate.
-   - **Inter-phase cooldown** before Phase 3 too.
+   - **Merge-idle wait** before Phase 3 too.
    - **Phase 3 — request-rate ramp (SDK-fleet shape).** Batch size fixed at
      `--phase3-batch-size` (default **100**, matching typical language-SDK
      `BatchSpanProcessor` output rather than the collector's 8192). Request
@@ -109,13 +170,13 @@ Per matrix entry (one tier × one mode × one signal):
    reports; per-phase numbers stay in the JSON for shape-specific analysis.
 7. `hetzner-down.sh` deletes everything via a bash `trap` — even on Ctrl-C.
 
-### SUT crash recovery
+### SUT crash recovery & restart detection
 
 `pgch` and `managed-ch` containers declare `restart: on-failure:3` in their
 compose files. When ClickHouse OOMs under Phase 1's heaviest step (typical
 on `ccx33` + `pgch` once Phase 2 climbs past `batch=16384 × rate=100`), Docker
-auto-restarts the crashed service within seconds. After each inter-phase
-cooldown the loadgen then polls `GET <target>/health` for up to
+auto-restarts the crashed service within seconds. After each merge-idle
+wait the loadgen polls `GET <target>/health` for up to
 `--sut-health-timeout-seconds` (default 60 s) to confirm the SUT actually
 came back. If `/health` never returns 200, the loadgen skips the remaining
 phases and writes the partial JSON via the existing per-step checkpoint —
@@ -123,6 +184,18 @@ no data already collected is lost. The bounded `on-failure:3` retry count
 prevents a permanently-broken SUT from restart-looping forever; if the
 third restart also crashes, the container stays down and the health-poll
 fires the clean-abort path.
+
+**Detecting silent CH restarts.** Compose's `restart` policy used to mean
+a crashed-and-recovered ClickHouse was invisible: the SUT came back up and
+the bench kept running, producing a "passing" report that hid the
+incident. The bench now tracks CH's `uptime()` across every step. If
+step N's uptime is lower than step N-1's uptime plus the elapsed step
+window, ClickHouse restarted mid-step. The step is marked failed with
+`failReason: CH restarted mid-step (...)`, `chRestarted: true` is set on
+the top-level JSON, the run skips remaining phases, and the loadgen
+exits non-zero. The chart renderer hatches the affected headline bar
+in red with a `CH↻` annotation so the dispatch report flags the run as
+invalid rather than burying the restart in a passing number.
 
 After all matrix entries finish, `chart.py` renders the full chart suite
 (headline bars, Phase 1 / 2 / 3 ramps, Pareto, tier scaling, cliff grid,
@@ -198,6 +271,12 @@ vice-versa.
 
 # Switch to the read-probe scenario (writes to benchmarks/results-probe/)
 ./benchmarks/scripts/run-local.sh --scenario read-probe
+
+# Async-insert pass — same matrix but with CH_ASYNC_INSERT=1 on the SUT.
+# Output filenames pick up a -async suffix so paired bars render in
+# chart-headline-<signal>.png. Dispatch the default (sync) pass first,
+# then this one, into the same results folder.
+./benchmarks/scripts/run-local.sh --tier ccx13 --mode pgch --signal spans --async
 ```
 
 ## Running from GitHub Actions
@@ -278,13 +357,14 @@ benchmarks/
     docker-compose.pgch.yml
     docker-compose.managed-ch.yml  # External CH; Postgres still local
   loadgen/                       # The Go binary that generates load (OTLP-only)
-    main.go                      # CLI + orchestration
+    main.go                      # CLI + orchestration + merge-idle wait
     ingest.go                    # Worker pool driving the selected signal sender
     otlp_common.go               # Shared OTLP helpers + signalSender interface
     otlp_spans.go                # ExportTraceServiceRequest builder
     otlp_metrics.go              # ExportMetricsServiceRequest builder (Gauge)
     otlp_logs.go                 # ExportLogsServiceRequest builder
-    ramp.go                      # Two-phase ramp (batch size, then request rate)
+    ramp.go                      # Three-phase ramp + CH-restart detection
+    ch_snapshot.go               # GET /api/health/deep -> per-step ch{} block
     stats.go                     # Latency tracker (percentiles via sort)
     util.go, log.go              # Misc helpers
   scripts/

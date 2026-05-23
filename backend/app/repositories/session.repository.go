@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 	"github.com/tracewayapp/traceway/backend/app/chdb"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -21,7 +20,7 @@ func (r *sessionRepository) Upsert(ctx context.Context, sessions []models.Sessio
 	if len(sessions) == 0 {
 		return nil
 	}
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
+	batch, err := chdb.Conn.PrepareBatch(chdb.BatchCtx(),
 		"INSERT INTO sessions (id, project_id, started_at, ended_at, duration, client_ip, attributes, app_version, server_name, distributed_trace_id, version)")
 	if err != nil {
 		return err

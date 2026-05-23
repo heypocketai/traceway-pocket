@@ -3,7 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"sync/atomic"
 	"time"
+)
+
+// Cross-phase state for detecting CH restarts. Single-run CLI; package-level
+// state is fine. lastCHUptime stores the most recent step's CH uptime (0
+// before the first reachable snapshot); chRestarted is set sticky-true once a
+// restart is observed so main() can mark the run failed and exit non-zero.
+var (
+	lastCHUptime atomic.Int64
+	chRestarted  atomic.Bool
 )
 
 type stepResult struct {
@@ -14,6 +25,7 @@ type stepResult struct {
 	ActualItemsPerSec    float64         `json:"actualItemsPerSec"`
 	Rejected             int64           `json:"rejected"`
 	Ingest               latencySnapshot `json:"ingest"`
+	CH                   chSnapshot      `json:"ch"`
 	Passed               bool            `json:"passed"`
 	FailReason           string          `json:"failReason,omitempty"`
 }
@@ -40,6 +52,7 @@ type finalReport struct {
 	ReadProbe                 *readProbeResult `json:"readProbe,omitempty"`
 	MaxSustainableItemsPerSec float64          `json:"maxSustainableItemsPerSec,omitempty"`
 	MaxFillLevelPassed        int64            `json:"maxFillLevelPassed,omitempty"`
+	ChRestarted               bool             `json:"chRestarted,omitempty"`
 }
 
 func (r *finalReport) computeHeadline() {
@@ -83,7 +96,7 @@ type phaseCheckpoint func(phaseResult)
 // size step by step. Stops at the first failing step. Returns a phaseResult
 // whose MaxBatchSize is the largest batch that passed. Calls `checkpoint`
 // after each step (after both pass and fail) so partial state is durable.
-func runBatchSizeRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, checkpoint phaseCheckpoint) phaseResult {
+func runBatchSizeRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, client *http.Client, checkpoint phaseCheckpoint) phaseResult {
 	res := phaseResult{
 		Kind:             "batch-size-ramp",
 		FixedRequestRate: cfg.phase1FixedRate,
@@ -96,7 +109,7 @@ func runBatchSizeRamp(ctx context.Context, cfg config, ing *ingester, ingest *la
 			break
 		}
 		ing.SetBatchSize(batch)
-		s := runOneStep(ctx, cfg, ing, ingest, idx+1, batch, cfg.phase1FixedRate)
+		s := runOneStep(ctx, cfg, ing, ingest, client, idx+1, batch, cfg.phase1FixedRate)
 		res.Steps = append(res.Steps, s)
 		fmt.Fprintf(stderrPrefix(), "phase1 step %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
 			s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
@@ -118,7 +131,7 @@ func runBatchSizeRamp(ctx context.Context, cfg config, ing *ingester, ingest *la
 // and grows request rate step by step. Phase 2's purpose: at the largest
 // single-request payload the SUT can absorb (collector-shape), find the
 // req/sec ceiling.
-func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, phase1 phaseResult, checkpoint phaseCheckpoint) phaseResult {
+func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, client *http.Client, phase1 phaseResult, checkpoint phaseCheckpoint) phaseResult {
 	batch := phase1.MaxBatchSize
 	if batch <= 0 {
 		batch = cfg.phase2BatchCap
@@ -126,7 +139,7 @@ func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *
 	if batch > cfg.phase2BatchCap {
 		batch = cfg.phase2BatchCap
 	}
-	return runRateRamp(ctx, cfg, ing, ingest, batch, cfg.phase2RequestRates, "request-rate-ramp", "phase2", checkpoint)
+	return runRateRamp(ctx, cfg, ing, ingest, client, batch, cfg.phase2RequestRates, "request-rate-ramp", "phase2", checkpoint)
 }
 
 // runSmallBatchRateRamp holds batchSize fixed at cfg.phase3BatchSize (default
@@ -136,14 +149,14 @@ func runRequestRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *
 // SDK fleets in the wild send hundreds-to-thousands of small batches per
 // second — language-SDK BatchSpanProcessor defaults are 512 per batch on a
 // 5 s rotation, often much less in practice; this phase covers that regime.
-func runSmallBatchRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, checkpoint phaseCheckpoint) phaseResult {
-	return runRateRamp(ctx, cfg, ing, ingest, cfg.phase3BatchSize, cfg.phase3RequestRates, "small-batch-rate-ramp", "phase3", checkpoint)
+func runSmallBatchRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, client *http.Client, checkpoint phaseCheckpoint) phaseResult {
+	return runRateRamp(ctx, cfg, ing, ingest, client, cfg.phase3BatchSize, cfg.phase3RequestRates, "small-batch-rate-ramp", "phase3", checkpoint)
 }
 
 // runRateRamp is the shared engine for Phase 2 and Phase 3: hold batch
 // fixed, ramp request rate, bisect after the first failing step. logPrefix
 // is just for stderr messages ("phase2" / "phase3").
-func runRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, batch int, rates []float64, kind, logPrefix string, checkpoint phaseCheckpoint) phaseResult {
+func runRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, client *http.Client, batch int, rates []float64, kind, logPrefix string, checkpoint phaseCheckpoint) phaseResult {
 	res := phaseResult{
 		Kind:           kind,
 		FixedBatchSize: batch,
@@ -163,7 +176,7 @@ func runRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latency
 		}
 		stepNo++
 		ing.SetRequestRate(rate)
-		s := runOneStep(ctx, cfg, ing, ingest, stepNo, batch, rate)
+		s := runOneStep(ctx, cfg, ing, ingest, client, stepNo, batch, rate)
 		res.Steps = append(res.Steps, s)
 		fmt.Fprintf(stderrPrefix(), "%s step %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
 			logPrefix, s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
@@ -196,7 +209,7 @@ func runRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latency
 			mid := (lastPassRate + firstFailRate) / 2
 			stepNo++
 			ing.SetRequestRate(mid)
-			s := runOneStep(ctx, cfg, ing, ingest, stepNo, batch, mid)
+			s := runOneStep(ctx, cfg, ing, ingest, client, stepNo, batch, mid)
 			res.Steps = append(res.Steps, s)
 			fmt.Fprintf(stderrPrefix(), "%s bisect %d: batch=%d rate=%.1f items/s=%.0f p99=%.0fms err=%.2f%% passed=%t %s\n",
 				logPrefix, s.Step, s.BatchSize, s.RequestRate, s.ActualItemsPerSec, s.Ingest.P99, s.Ingest.ErrRate*100, s.Passed, s.FailReason)
@@ -220,7 +233,7 @@ func runRateRamp(ctx context.Context, cfg config, ing *ingester, ingest *latency
 // latency + item counters. The drain window matters: without it, every step
 // boundary cancels ~workerCount in-flight requests mid-flight, inflating the
 // recorded error count and depressing the OK count.
-func runOneStep(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, stepNo, batchSize int, requestRate float64) stepResult {
+func runOneStep(ctx context.Context, cfg config, ing *ingester, ingest *latencyTracker, client *http.Client, stepNo, batchSize int, requestRate float64) stepResult {
 	ingest.SnapshotAndReset()
 	ing.SnapshotAndResetItems()
 
@@ -241,6 +254,22 @@ func runOneStep(ctx context.Context, cfg config, ing *ingester, ingest *latencyT
 
 	snap := ingest.SnapshotAndReset()
 	attempted, rejected := ing.SnapshotAndResetItems()
+	ch := fetchCHSnapshot(ctx, cfg, client)
+
+	// Restart detection: if ClickHouse's uptime is materially less than what
+	// it was at the previous step's snapshot, the CH process restarted during
+	// this step. The compose restart policy may have brought it back, but the
+	// numbers from this step (and the preceding one) are no longer
+	// interpretable, so the run is marked failed and remaining phases skipped.
+	prev := lastCHUptime.Load()
+	restartedThisStep := false
+	if ch.Reachable && ch.UptimeSec > 0 {
+		if prev > 0 && ch.UptimeSec < prev+int64(elapsed.Seconds()) {
+			restartedThisStep = true
+			chRestarted.Store(true)
+		}
+		lastCHUptime.Store(ch.UptimeSec)
+	}
 
 	var attemptedIps, actualIps float64
 	if elapsed > 0 {
@@ -258,6 +287,10 @@ func runOneStep(ctx context.Context, cfg config, ing *ingester, ingest *latencyT
 	}
 
 	passed, reason := evaluateStep(cfg, snap, attempted, rejected, requestRate, elapsed)
+	if restartedThisStep {
+		passed = false
+		reason = fmt.Sprintf("CH restarted mid-step (uptime %ds < previous %ds + step %ds)", ch.UptimeSec, prev, int64(elapsed.Seconds()))
+	}
 
 	return stepResult{
 		Step:                 stepNo,
@@ -267,6 +300,7 @@ func runOneStep(ctx context.Context, cfg config, ing *ingester, ingest *latencyT
 		ActualItemsPerSec:    actualIps,
 		Rejected:             rejected,
 		Ingest:               snap,
+		CH:                   ch,
 		Passed:               passed,
 		FailReason:           reason,
 	}

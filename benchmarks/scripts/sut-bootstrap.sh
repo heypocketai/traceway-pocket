@@ -85,8 +85,9 @@ EOF
     compose_args=( --env-file benchmarks/compose/managed-ch.env "${compose_args[@]}" )
 fi
 
-echo "bringing up compose stack (mode=${MODE}) on ${SUT_IP}" >&2
-bench_ssh "${SUT_IP}" "cd /opt/traceway && BENCH_PORT=80 docker compose ${compose_args[*]} up -d --build"
+CH_ASYNC_INSERT_VAL="${CH_ASYNC_INSERT:-0}"
+echo "bringing up compose stack (mode=${MODE}, CH_ASYNC_INSERT=${CH_ASYNC_INSERT_VAL}) on ${SUT_IP}" >&2
+bench_ssh "${SUT_IP}" "cd /opt/traceway && BENCH_PORT=80 CH_ASYNC_INSERT=${CH_ASYNC_INSERT_VAL} docker compose ${compose_args[*]} up -d --build"
 
 echo "polling /health on ${SUT_IP}" >&2
 deadline=$(( $(date +%s) + 600 ))   # cold compose build can hit 10 min on small tiers

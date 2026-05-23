@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 
 	"github.com/tracewayapp/traceway/backend/app/chdb"
@@ -48,7 +47,7 @@ func (r *logRecordRepository) InsertAsync(ctx context.Context, records []models.
 	}
 
 	batch, err := chdb.Conn.PrepareBatch(
-		clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
+		chdb.BatchCtx(),
 		"INSERT INTO log_records (id, project_id, timestamp, trace_id, span_id, trace_flags, severity_text, severity_number, service_name, body, resource_schema_url, resource_attributes, scope_schema_url, scope_name, scope_version, scope_attributes, log_attributes)",
 	)
 	if err != nil {

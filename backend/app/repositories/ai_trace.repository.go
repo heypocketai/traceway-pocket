@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 	"github.com/tracewayapp/traceway/backend/app/chdb"
 	"github.com/tracewayapp/traceway/backend/app/models"
@@ -19,7 +18,7 @@ import (
 type aiTraceRepository struct{}
 
 func (r *aiTraceRepository) InsertAsync(ctx context.Context, lines []models.AiTrace) error {
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
+	batch, err := chdb.Conn.PrepareBatch(chdb.BatchCtx(),
 		"INSERT INTO ai_traces (id, project_id, recorded_at, duration, status_code, model, response_model, provider, operation, input_tokens, output_tokens, total_tokens, cached_tokens, reasoning_tokens, input_cost, output_cost, total_cost, trace_name, user_id, finish_reason, server_name, app_version, storage_key, attributes, distributed_trace_id, is_root)")
 	if err != nil {
 		return err

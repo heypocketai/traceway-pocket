@@ -8,14 +8,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 )
 
 type metricPointRepository struct{}
 
 func (r *metricPointRepository) InsertAsync(ctx context.Context, points []models.MetricPoint) error {
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO metric_points (project_id, name, value, tags, recorded_at)")
+	batch, err := chdb.Conn.PrepareBatch(chdb.BatchCtx(), "INSERT INTO metric_points (project_id, name, value, tags, recorded_at)")
 	if err != nil {
 		return err
 	}

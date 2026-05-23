@@ -4,7 +4,7 @@
 # GitHub workflow; treat this as the single source of truth for matrix-entry
 # orchestration.
 #
-# Usage: run-matrix-entry.sh <tier> <mode> <signal> <duration> <out-dir> [smoke]
+# Usage: run-matrix-entry.sh <tier> <mode> <signal> <duration> <out-dir> [smoke] [async]
 #   <tier>      ccx13 | ccx23 | ccx33 | ccx43
 #   <mode>      sqlite | pgch
 #   <signal>    spans | metrics | logs
@@ -12,16 +12,18 @@
 #   <out-dir>   Directory to write <tier>-<mode>-<signal>.json into
 #   [smoke]     "smoke" to enable short-step overrides (--phase1-batch-sizes
 #               256,1024 --phase2-request-rates 1,5 --step-duration 15s).
-#               Optional.
+#               Optional; pass "" to skip when also passing [async].
+#   [async]     "async" to set CH_ASYNC_INSERT=1 on the SUT. Output filename
+#               gains a -async suffix when set. Optional.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 if [[ $# -lt 5 ]]; then
-    echo "usage: $0 <tier> <mode> <signal> <duration> <out-dir> [smoke]" >&2
+    echo "usage: $0 <tier> <mode> <signal> <duration> <out-dir> [smoke] [async]" >&2
     exit 2
 fi
-TIER="$1"; MODE="$2"; SIGNAL="$3"; DURATION="$4"; OUT_DIR="$5"; SMOKE="${6:-}"
+TIER="$1"; MODE="$2"; SIGNAL="$3"; DURATION="$4"; OUT_DIR="$5"; SMOKE="${6:-}"; ASYNC_FLAG="${7:-}"
 LOCATION="${BENCH_LOCATION:-nbg1}"
 SCENARIO="${BENCH_SCENARIO:-throughput}"
 
@@ -65,7 +67,14 @@ SUT_PUBLIC_IP=$(printf '%s' "${INFRA_JSON}" | jq -r '.sutPublicIp')
 SUT_PRIVATE_IP=$(printf '%s' "${INFRA_JSON}" | jq -r '.sutPrivateIp')
 LOADGEN_PUBLIC_IP=$(printf '%s' "${INFRA_JSON}" | jq -r '.loadgenPublicIp')
 
-# 2. Bring up the backend on the SUT.
+# 2. Bring up the backend on the SUT. CH_ASYNC_INSERT propagates through to
+# the docker compose env via sut-bootstrap.sh.
+async_suffix=""
+if [[ "${ASYNC_FLAG}" == "async" ]]; then
+    export CH_ASYNC_INSERT=1
+    async_suffix="-async"
+    echo "CH_ASYNC_INSERT=1 (async-insert benchmark pass)" >&2
+fi
 "${SCRIPT_DIR}/sut-bootstrap.sh" "${SUT_PUBLIC_IP}" "${MODE}"
 
 # 3. Run the loadgen, pulling JSON back into OUT_DIR.
@@ -78,7 +87,7 @@ if [[ "${SMOKE}" == "smoke" ]]; then
     fi
 fi
 
-OUT_PATH="${OUT_DIR}/${TIER}-${MODE}-${SIGNAL}-${SCENARIO}.json"
+OUT_PATH="${OUT_DIR}/${TIER}-${MODE}-${SIGNAL}-${SCENARIO}${async_suffix}.json"
 "${SCRIPT_DIR}/loadgen-bootstrap.sh" \
     "${LOADGEN_PUBLIC_IP}" \
     "${SUT_PRIVATE_IP}" \
@@ -91,4 +100,4 @@ OUT_PATH="${OUT_DIR}/${TIER}-${MODE}-${SIGNAL}-${SCENARIO}.json"
     "${extra_args[@]}"
 
 # Trap handles teardown — no explicit call needed.
-echo "matrix entry ${TIER}-${MODE}-${SIGNAL}-${SCENARIO} complete -> ${OUT_PATH}" >&2
+echo "matrix entry ${TIER}-${MODE}-${SIGNAL}-${SCENARIO}${async_suffix} complete -> ${OUT_PATH}" >&2

@@ -6,7 +6,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 	"github.com/tracewayapp/traceway/backend/app/chdb"
 )
@@ -31,7 +30,7 @@ type firedNotificationRepository struct{}
 
 func (r *firedNotificationRepository) Insert(ctx context.Context, n FiredNotification) error {
 	batch, err := chdb.Conn.PrepareBatch(
-		clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
+		chdb.BatchCtx(),
 		"INSERT INTO fired_notifications (project_id, rule_id, rule_type, rule_name, channel_type, channel_name, severity, subject, body, status, error_message, endpoint, fired_at)",
 	)
 	if err != nil {

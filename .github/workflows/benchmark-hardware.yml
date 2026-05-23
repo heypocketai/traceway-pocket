@@ -33,6 +33,11 @@ on:
         description: 'Hetzner datacenter (nbg1, fsn1, hel1, ash, hil)'
         required: true
         default: 'nbg1'
+      async_insert:
+        description: 'When true, sets CH_ASYNC_INSERT=1 on the SUT for this dispatch. Result files gain a -async suffix so paired bars can be rendered alongside the default (off) pass.'
+        required: true
+        type: boolean
+        default: false
 
 concurrency:
   group: benchmark-hardware
@@ -119,12 +124,17 @@ jobs:
         run: ./benchmarks/scripts/preflight.sh
 
       - name: Run matrix entry (${{ matrix.tier }} / ${{ matrix.mode }} / ${{ matrix.signal }})
-        run: ./benchmarks/scripts/run-matrix-entry.sh "${{ matrix.tier }}" "${{ matrix.mode }}" "${{ matrix.signal }}" "${{ github.event.inputs.duration }}" benchmarks/_artifact
+        run: |
+          async_arg=""
+          if [[ "${{ github.event.inputs.async_insert }}" == "true" ]]; then
+              async_arg="async"
+          fi
+          ./benchmarks/scripts/run-matrix-entry.sh "${{ matrix.tier }}" "${{ matrix.mode }}" "${{ matrix.signal }}" "${{ github.event.inputs.duration }}" benchmarks/_artifact "" "${async_arg}"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: result-${{ matrix.tier }}-${{ matrix.mode }}-${{ matrix.signal }}
+          name: result-${{ matrix.tier }}-${{ matrix.mode }}-${{ matrix.signal }}${{ github.event.inputs.async_insert == 'true' && '-async' || '' }}
           path: benchmarks/_artifact/*.json
           if-no-files-found: warn
 

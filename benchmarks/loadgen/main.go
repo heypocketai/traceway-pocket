@@ -33,6 +33,7 @@ type config struct {
 	softCliffRatio            float64
 	stepDrainSeconds          time.Duration
 	interPhaseCooldownSeconds time.Duration
+	maxMergeIdleWait          time.Duration
 	sutHealthTimeoutSeconds   time.Duration
 	phase2BisectMaxSteps      int
 	phase2BisectTolerance     float64
@@ -72,7 +73,8 @@ func main() {
 	flag.Float64Var(&cfg.ingestErrThreshold, "ingest-err-threshold", 0.05, "Step fails if combined (HTTP error + OTLP rejected) item rate exceeds this")
 	flag.Float64Var(&cfg.softCliffRatio, "soft-cliff-ratio", 0.70, "Step fails when achieved req-rate is below this fraction of target — catches saturated-but-not-erroring cliffs. 0 disables.")
 	flag.DurationVar(&cfg.stepDrainSeconds, "step-drain-seconds", 10*time.Second, "After step duration expires, wait up to this long for in-flight HTTP requests to complete before hard-canceling (reduces error-count noise at boundaries)")
-	flag.DurationVar(&cfg.interPhaseCooldownSeconds, "inter-phase-cooldown-seconds", 30*time.Second, "Pause between Phase 1 and Phase 2 to let the SUT drain queues and recover from Phase 1's final-step load. 0 disables.")
+	flag.DurationVar(&cfg.interPhaseCooldownSeconds, "inter-phase-cooldown-seconds", 0, "DEPRECATED: replaced by --max-merge-idle-wait, which polls CH directly. Non-zero values still apply as an additional pre-wait before merge-idle polling. 0 (default) disables.")
+	flag.DurationVar(&cfg.maxMergeIdleWait, "max-merge-idle-wait", 5*time.Minute, "Between phases, poll /health/deep until activeMerges==0 and partsCount is stable for two consecutive polls, or this timeout elapses. 0 disables (skip merge-idle wait entirely).")
 	flag.DurationVar(&cfg.sutHealthTimeoutSeconds, "sut-health-timeout-seconds", 60*time.Second, "After each inter-phase cooldown, poll GET <target>/health for up to this long. If the SUT doesn't return 200 in time, remaining phases are skipped and the partial JSON is written via the existing checkpoint. 0 disables the check.")
 	flag.IntVar(&cfg.phase2BisectMaxSteps, "phase2-bisect-max-steps", 3, "After Phase 2 finds the cliff, run up to this many bisection steps between the last passing and first failing rate to narrow the cliff. 0 disables.")
 	flag.Float64Var(&cfg.phase2BisectTolerance, "phase2-bisect-tolerance", 0.20, "Bisection stops when (firstFailRate-lastPassRate)/lastPassRate falls below this fraction (e.g. 0.20 = stop when the cliff is pinned to within 20% of the last passing rate).")
@@ -173,6 +175,7 @@ func main() {
 	// kill of the writer process itself) never see a half-written file.
 	writeCheckpoint := func() {
 		out.EndedAt = time.Now().UTC().Format(time.RFC3339)
+		out.ChRestarted = chRestarted.Load()
 		out.computeHeadline()
 		if err := writeReportAtomic(cfg.reportOut, &out); err != nil {
 			fmt.Fprintf(os.Stderr, "checkpoint write failed: %v\n", err)
@@ -181,24 +184,21 @@ func main() {
 
 	switch cfg.scenario {
 	case "throughput":
-		phase1 := runBatchSizeRamp(ctx, cfg, ing, ingestStats, func(p phaseResult) {
+		phase1 := runBatchSizeRamp(ctx, cfg, ing, ingestStats, httpClient, func(p phaseResult) {
 			out.Phase1 = &p
 			writeCheckpoint()
 		})
 		out.Phase1 = &phase1
-		// Cool-down between phases: Phase 1's last step often runs the SUT at
-		// 70-99% of capacity, leaving its internal queues (CH merges, PG WAL,
-		// HTTP handler pool) saturated. Jumping straight into Phase 2 with the
-		// SUT still digesting that wave produces "0 OK / 0 errors" garbage
-		// because new requests sit on the SUT-side TCP backlog without ever
-		// reaching a handler or timing out.
-		if cfg.interPhaseCooldownSeconds > 0 {
-			fmt.Fprintf(stderrPrefix(), "inter-phase cooldown: %v\n", cfg.interPhaseCooldownSeconds)
-			select {
-			case <-time.After(cfg.interPhaseCooldownSeconds):
-			case <-ctx.Done():
-			}
+		if chRestarted.Load() {
+			fmt.Fprintf(stderrPrefix(), "CH restart observed in Phase 1 — skipping remaining phases\n")
+			break
 		}
+		// Between phases: Phase 1's last step often runs the SUT at 70-99% of
+		// capacity, leaving CH parts queues unmerged and PG/HTTP pools saturated.
+		// Jumping straight into Phase 2 produces garbage data — instead, poll
+		// /health/deep until CH merges are idle and parts count has stabilized.
+		preWaitCooldown(ctx, cfg)
+		waitForMergesIdle(ctx, cfg, httpClient, "phase 1 -> phase 2")
 		// Verify the SUT survived Phase 1 before launching Phase 2. If the
 		// compose restart policy didn't bring the SUT back, skip remaining
 		// phases — the final writeCheckpoint after the switch captures
@@ -207,27 +207,28 @@ func main() {
 			fmt.Fprintf(stderrPrefix(), "SUT unhealthy after Phase 1 cooldown — skipping Phase 2/3: %v\n", err)
 			break
 		}
-		phase2 := runRequestRateRamp(ctx, cfg, ing, ingestStats, phase1, func(p phaseResult) {
+		phase2 := runRequestRateRamp(ctx, cfg, ing, ingestStats, httpClient, phase1, func(p phaseResult) {
 			out.Phase2 = &p
 			writeCheckpoint()
 		})
 		out.Phase2 = &phase2
+		if chRestarted.Load() {
+			fmt.Fprintf(stderrPrefix(), "CH restart observed in Phase 2 — skipping Phase 3\n")
+			break
+		}
 
 		// Phase 3 — small-batch high-rate (SDK-fleet shape). Independent of
 		// Phase 1/2 results, so it runs even if Phase 2 produced no passing
-		// steps. Same cooldown before it as between 1 and 2.
-		if cfg.interPhaseCooldownSeconds > 0 && ctx.Err() == nil {
-			fmt.Fprintf(stderrPrefix(), "inter-phase cooldown: %v\n", cfg.interPhaseCooldownSeconds)
-			select {
-			case <-time.After(cfg.interPhaseCooldownSeconds):
-			case <-ctx.Done():
-			}
+		// steps. Same merge-idle wait as between 1 and 2.
+		if ctx.Err() == nil {
+			preWaitCooldown(ctx, cfg)
+			waitForMergesIdle(ctx, cfg, httpClient, "phase 2 -> phase 3")
 		}
 		if err := waitForSutHealthy(ctx, cfg.target, cfg.sutHealthTimeoutSeconds); err != nil {
 			fmt.Fprintf(stderrPrefix(), "SUT unhealthy after Phase 2 cooldown — skipping Phase 3: %v\n", err)
 			break
 		}
-		phase3 := runSmallBatchRateRamp(ctx, cfg, ing, ingestStats, func(p phaseResult) {
+		phase3 := runSmallBatchRateRamp(ctx, cfg, ing, ingestStats, httpClient, func(p phaseResult) {
 			out.Phase3 = &p
 			writeCheckpoint()
 		})
@@ -251,6 +252,11 @@ func main() {
 	case "read-probe":
 		fmt.Fprintf(os.Stderr, "wrote %s: signal=%s max fill level passed = %d rows\n",
 			cfg.reportOut, cfg.signal, out.MaxFillLevelPassed)
+	}
+
+	if chRestarted.Load() {
+		fmt.Fprintln(os.Stderr, "FAILED: ClickHouse restarted during the run; treating result as invalid")
+		os.Exit(1)
 	}
 }
 
@@ -297,6 +303,99 @@ func waitForSutHealthy(ctx context.Context, target string, timeout time.Duration
 			return ctx.Err()
 		}
 	}
+}
+
+// preWaitCooldown honours the deprecated --inter-phase-cooldown-seconds flag
+// when set. Most invocations leave it at 0 and rely entirely on
+// waitForMergesIdle; this hook stays so existing local scripts that still pass
+// the old flag don't silently skip the wait.
+func preWaitCooldown(ctx context.Context, cfg config) {
+	if cfg.interPhaseCooldownSeconds <= 0 {
+		return
+	}
+	fmt.Fprintf(stderrPrefix(), "inter-phase cooldown (deprecated flag): %v\n", cfg.interPhaseCooldownSeconds)
+	select {
+	case <-time.After(cfg.interPhaseCooldownSeconds):
+	case <-ctx.Done():
+	}
+}
+
+// waitForMergesIdle polls /health/deep every 5s until activeMerges == 0 AND
+// partsCount has been stable (within ±5%) for two consecutive polls, OR the
+// configured timeout elapses. Returns without error in all cases — the wait is
+// best-effort observability, not a verdict; if CH never settles we just move
+// on and the next phase's results will show it.
+func waitForMergesIdle(ctx context.Context, cfg config, client *http.Client, label string) {
+	if cfg.maxMergeIdleWait <= 0 {
+		return
+	}
+
+	// SQLite mode has no ClickHouse — /health/deep returns chReachable:false
+	// and there are no merges to wait for. Without this fast-path the loop
+	// would burn the full --max-merge-idle-wait (default 5m) between every
+	// phase doing nothing useful.
+	if first := fetchCHSnapshot(ctx, cfg, client); !first.Reachable {
+		fmt.Fprintf(stderrPrefix(), "merge-idle [%s]: CH not reachable (sqlite mode or backend down) — skipping wait\n", label)
+		return
+	}
+
+	deadline := time.Now().Add(cfg.maxMergeIdleWait)
+	pollEvery := 5 * time.Second
+	stableThreshold := 0.05
+	requiredStable := 2
+
+	var prevParts int64 = -1
+	stable := 0
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		snap := fetchCHSnapshot(ctx, cfg, client)
+		fmt.Fprintf(stderrPrefix(), "merge-idle [%s]: reachable=%t activeMerges=%d partsCount=%d longestMerge=%.1fs\n",
+			label, snap.Reachable, snap.ActiveMerges, snap.PartsCount, snap.LongestMergeSec)
+
+		if snap.Reachable && snap.ActiveMerges == 0 {
+			if prevParts >= 0 {
+				delta := float64(snap.PartsCount-prevParts) / float64(maxInt64(prevParts, 1))
+				if delta < 0 {
+					delta = -delta
+				}
+				if delta <= stableThreshold {
+					stable++
+					if stable >= requiredStable {
+						fmt.Fprintf(stderrPrefix(), "merge-idle [%s]: settled (parts=%d)\n", label, snap.PartsCount)
+						return
+					}
+				} else {
+					stable = 0
+				}
+			}
+			prevParts = snap.PartsCount
+		} else {
+			stable = 0
+			if snap.Reachable {
+				prevParts = snap.PartsCount
+			}
+		}
+
+		if time.Now().After(deadline) {
+			fmt.Fprintf(stderrPrefix(), "merge-idle [%s]: timeout after %v (activeMerges=%d partsCount=%d) — advancing anyway\n",
+				label, cfg.maxMergeIdleWait, snap.ActiveMerges, snap.PartsCount)
+			return
+		}
+		select {
+		case <-time.After(pollEvery):
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func maxInt64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // writeReportAtomic encodes the report into a sibling .tmp file and renames

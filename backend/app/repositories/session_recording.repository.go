@@ -9,7 +9,6 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +18,7 @@ func (r *sessionRecordingRepository) InsertAsync(ctx context.Context, recordings
 	if len(recordings) == 0 {
 		return nil
 	}
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)), "INSERT INTO session_recordings (id, project_id, exception_id, session_id, segment_index, file_path, recorded_at)")
+	batch, err := chdb.Conn.PrepareBatch(chdb.BatchCtx(), "INSERT INTO session_recordings (id, project_id, exception_id, session_id, segment_index, file_path, recorded_at)")
 	if err != nil {
 		return err
 	}

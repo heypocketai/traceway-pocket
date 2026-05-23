@@ -19,6 +19,7 @@ services:
       POSTGRES_SSLMODE: "disable"
       JWT_SECRET: "bench-jwt-secret-not-for-production-use-only-32chars+"
       GIN_MODE: "release"
+      CH_ASYNC_INSERT: "${CH_ASYNC_INSERT:-0}"
     depends_on:
       postgres:
         condition: service_healthy

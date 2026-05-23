@@ -7,7 +7,6 @@ import (
 	"github.com/tracewayapp/traceway/backend/app/models"
 	"context"
 
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/google/uuid"
 )
 
@@ -18,7 +17,7 @@ func (r *spanRepository) InsertAsync(ctx context.Context, spans []models.Span) e
 		return nil
 	}
 
-	batch, err := chdb.Conn.PrepareBatch(clickhouse.Context(context.Background(), clickhouse.WithAsync(false)),
+	batch, err := chdb.Conn.PrepareBatch(chdb.BatchCtx(),
 		"INSERT INTO spans (id, trace_id, project_id, name, start_time, duration, recorded_at, parent_span_id)")
 	if err != nil {
 		return err

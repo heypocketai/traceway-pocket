@@ -13,6 +13,7 @@
 #   run-local.sh --scenario read-probe  # same matrix but ingest-and-probe-reads
 #   run-local.sh --smoke                # 1 tier, 1 mode, 1 signal, short steps (~5 min)
 #   run-local.sh --tier ccx13 --mode sqlite --signal spans
+#   run-local.sh --async                # set CH_ASYNC_INSERT=1; -async suffix on output files
 #   run-local.sh --dry-run              # validate env + print plan, no provisioning
 #
 # Output:
@@ -33,6 +34,7 @@ SCENARIO="throughput"
 DURATION="30m"
 SMOKE=0
 DRY_RUN=0
+ASYNC=0
 
 usage() {
     sed -n '1,23p' "$0"; exit 2
@@ -46,6 +48,7 @@ while [[ $# -gt 0 ]]; do
         --scenario) SCENARIO="$2"; shift 2 ;;
         --duration) DURATION="$2"; shift 2 ;;
         --smoke)    SMOKE=1; shift ;;
+        --async)    ASYNC=1; shift ;;
         --dry-run)  DRY_RUN=1; shift ;;
         -h|--help)  usage ;;
         *) echo "unknown flag: $1" >&2; usage ;;
@@ -114,11 +117,17 @@ fi
 # strategy.matrix instead.
 smoke_arg=""
 [[ "${SMOKE}" -eq 1 ]] && smoke_arg="smoke"
+async_arg=""
+if [[ "${ASYNC}" -eq 1 ]]; then
+    async_arg="async"
+    export CH_ASYNC_INSERT=1
+    echo "CH_ASYNC_INSERT=1 — async-insert benchmark pass; output files will get -async suffix" >&2
+fi
 
 failures=()
 for e in "${plan[@]}"; do
     IFS='|' read -r tier mode signal <<<"${e}"
-    if ! "${SCRIPT_DIR}/run-matrix-entry.sh" "${tier}" "${mode}" "${signal}" "${DURATION}" "${OUT_DIR}" "${smoke_arg}"; then
+    if ! "${SCRIPT_DIR}/run-matrix-entry.sh" "${tier}" "${mode}" "${signal}" "${DURATION}" "${OUT_DIR}" "${smoke_arg}" "${async_arg}"; then
         echo "FAIL: ${tier}/${mode}/${signal}" >&2
         failures+=("${tier}/${mode}/${signal}")
     fi
