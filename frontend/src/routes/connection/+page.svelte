@@ -23,6 +23,7 @@
 	import javascript from 'svelte-highlight/languages/javascript';
 	import bash from 'svelte-highlight/languages/bash';
 	import php from 'svelte-highlight/languages/php';
+	import python from 'svelte-highlight/languages/python';
 	import yaml from 'svelte-highlight/languages/yaml';
 	import { themeState } from '$lib/state/theme.svelte';
 	import 'svelte-highlight/styles/github-dark.css';
@@ -109,6 +110,7 @@ service:
 		if (!projectWithToken) return go;
 		if (projectWithToken.framework === 'symfony') return php;
 		if (projectWithToken.framework === 'laravel') return php;
+		if (projectWithToken.framework === 'django') return python;
 		if (isJsFramework(projectWithToken.framework)) return javascript;
 		return go;
 	});
@@ -415,7 +417,7 @@ service:
 				<CardHeader>
 					<CardTitle>Installation</CardTitle>
 					<CardDescription
-						>Install the required packages{isJs ? '' : projectWithToken?.framework === 'symfony' || projectWithToken?.framework === 'laravel' ? ' using composer' : ' using go get'}.</CardDescription
+						>Install the required packages{isJs ? '' : projectWithToken?.framework === 'symfony' || projectWithToken?.framework === 'laravel' ? ' using composer' : projectWithToken?.framework === 'django' ? ' using pip' : ' using go get'}.</CardDescription
 					>
 				</CardHeader>
 				<CardContent>

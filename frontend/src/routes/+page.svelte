@@ -40,6 +40,7 @@
 	import javascript from 'svelte-highlight/languages/javascript';
 	import bash from 'svelte-highlight/languages/bash';
 	import php from 'svelte-highlight/languages/php';
+	import python from 'svelte-highlight/languages/python';
 	import { themeState } from '$lib/state/theme.svelte';
 	import yaml from 'svelte-highlight/languages/yaml';
 	import 'svelte-highlight/styles/github-dark.css';
@@ -142,7 +143,7 @@
 		projectWithToken ? getCodeLanguage(projectWithToken.framework) : ('go' as const)
 	);
 
-	const highlightLanguage = $derived(codeLanguage === 'javascript' ? javascript : codeLanguage === 'php' ? php : codeLanguage === 'bash' ? bash : go);
+	const highlightLanguage = $derived(codeLanguage === 'javascript' ? javascript : codeLanguage === 'php' ? php : codeLanguage === 'python' ? python : codeLanguage === 'bash' ? bash : go);
 
 	const testingRouteCode = $derived(getTestingRouteCode(projectWithToken?.framework));
 	const testingRouteCode2 = $derived(getTestingRouteCode2(projectWithToken?.framework));

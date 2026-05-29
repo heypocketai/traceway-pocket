@@ -43,6 +43,14 @@ const FRAMEWORKS = [
     badge: "production",
   },
   {
+    value: "python-django",
+    label: "Django",
+    description: "Django framework with OpenTelemetry auto-instrumentation.",
+    icon: "/django.png",
+    href: "/client/django",
+    badge: "new",
+  },
+  {
     value: "go-gin",
     label: "Go Gin",
     description:

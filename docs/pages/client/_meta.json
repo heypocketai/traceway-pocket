@@ -25,6 +25,7 @@
   "cloudflare": "Cloudflare Workers",
   "symfony": "Symfony",
   "laravel": "Laravel",
+  "django": "Django",
   "flutter": "Flutter",
   "android": "Android",
   "react-native": "React Native"

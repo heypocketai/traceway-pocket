@@ -34,6 +34,7 @@
         { value: 'jquery', label: 'jQuery', description: 'Legacy-friendly AJAX and DOM library', group: 'JavaScript' },
         { value: 'symfony', label: 'Symfony', description: 'PHP full-stack framework (OTLP)', group: 'PHP' },
         { value: 'laravel', label: 'Laravel', description: 'PHP full-stack framework (OTLP)', group: 'PHP' },
+        { value: 'django', label: 'Django', description: 'Python full-stack framework (OTLP)', group: 'Python' },
         { value: 'hono', label: 'Hono', description: 'Lightweight multi-runtime framework (OTLP)', group: 'Backend' },
         { value: 'cloudflare', label: 'Cloudflare', description: 'Cloudflare Workers (OTLP Traces)', group: 'Backend' },
         { value: 'opentelemetry', label: 'OpenTelemetry', description: 'Vendor-neutral observability', group: 'Backend' },
@@ -58,6 +59,7 @@
     const goFrameworks = $derived(filteredFrameworks.filter(f => f.group === 'Go'));
     const jsFrameworks = $derived(filteredFrameworks.filter(f => f.group === 'JavaScript'));
     const phpFrameworks = $derived(filteredFrameworks.filter(f => f.group === 'PHP'));
+    const pythonFrameworks = $derived(filteredFrameworks.filter(f => f.group === 'Python'));
     const backendFrameworks = $derived(filteredFrameworks.filter(f => f.group === 'Backend'));
     const mobileFrameworks = $derived(filteredFrameworks.filter(f => f.group === 'Mobile'));
 
@@ -181,6 +183,32 @@
                         <Combobox.Group>
                             <Combobox.GroupHeading class="px-2 py-1.5 text-xs font-semibold text-muted-foreground">PHP</Combobox.GroupHeading>
                             {#each phpFrameworks as fw}
+                                <Combobox.Item
+                                    value={fw.value}
+                                    class={cn(
+                                        "data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 ps-2 pe-8 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+                                    )}
+                                >
+                                    {#snippet children({ selected })}
+                                        <div class="flex items-center gap-2">
+                                            <FrameworkIcon framework={fw.value} />
+                                            <div class="flex flex-col">
+                                                <span class="font-medium">{fw.label}</span>
+                                                <span class="text-xs text-muted-foreground">{fw.description}</span>
+                                            </div>
+                                        </div>
+                                        {#if selected}
+                                            <Check class="absolute end-2 size-4" />
+                                        {/if}
+                                    {/snippet}
+                                </Combobox.Item>
+                            {/each}
+                        </Combobox.Group>
+                    {/if}
+                    {#if pythonFrameworks.length > 0}
+                        <Combobox.Group>
+                            <Combobox.GroupHeading class="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Python</Combobox.GroupHeading>
+                            {#each pythonFrameworks as fw}
                                 <Combobox.Item
                                     value={fw.value}
                                     class={cn(

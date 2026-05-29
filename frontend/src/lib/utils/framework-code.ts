@@ -38,6 +38,8 @@ export function getInstallCommand(framework: Framework): string {
 			return 'composer require traceway/opentelemetry-symfony open-telemetry/exporter-otlp php-http/guzzle7-adapter';
 		case 'laravel':
 			return 'composer require keepsuit/laravel-opentelemetry open-telemetry/exporter-otlp php-http/guzzle7-adapter';
+		case 'django':
+			return 'pip install opentelemetry-distro opentelemetry-exporter-otlp opentelemetry-instrumentation-django && opentelemetry-bootstrap -a install';
 		case 'cloudflare':
 			return '';
 		case 'opentelemetry':
@@ -339,6 +341,28 @@ $kernel->terminate($request, $response);`;
 // traced automatically. Open config/opentelemetry.php to tune which
 // instrumentations are enabled.`;
 
+		case 'django':
+			return `# .env  — point the OTLP exporter at Traceway
+#
+# OTEL_SERVICE_NAME=my-django-app
+# OTEL_TRACES_EXPORTER=otlp
+# OTEL_METRICS_EXPORTER=otlp
+# OTEL_LOGS_EXPORTER=otlp
+# OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+# OTEL_EXPORTER_OTLP_ENDPOINT=${backendUrl}/api/otel
+# OTEL_EXPORTER_OTLP_HEADERS=Authorization=Bearer%20${token || 'YOUR_TOKEN'}
+# OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED=true
+
+# Then launch Django through the OTel agent — no code changes needed:
+#
+#   opentelemetry-instrument python manage.py runserver
+#   opentelemetry-instrument gunicorn myproject.wsgi:application
+#
+# DjangoInstrumentor auto-installs middleware at index 0 and traces every
+# inbound request. opentelemetry-bootstrap also wired psycopg/redis/requests/
+# celery/logging instrumentation, so DB queries, cache ops, outbound HTTP
+# and queued tasks are traced automatically.`;
+
 		case 'hono':
 			return '';
 
@@ -424,6 +448,23 @@ Route::get('/testing', function () {
     throw new \\RuntimeException('Test error from Traceway integration');
 });`;
 	}
+	if (framework === 'django') {
+		return `# myapp/views.py
+from django.http import HttpResponse
+
+
+def testing(request):
+    raise RuntimeError("Test error from Traceway integration")
+
+
+# myproject/urls.py
+from django.urls import path
+from myapp import views
+
+urlpatterns = [
+    path("testing/", views.testing),
+]`;
+	}
 	if (framework === 'flutter') {
 		return `// Trigger a test error
 throw StateError('Test error from Traceway integration');`;
@@ -446,6 +487,9 @@ export function getTestingRouteCode2(framework?: Framework): string {
 		return '';
 	}
 	if (framework === 'laravel') {
+		return '';
+	}
+	if (framework === 'django') {
 		return '';
 	}
 	if (framework === 'flutter') {
@@ -548,15 +592,17 @@ export function getFrameworkLabel(framework: Framework): string {
 		opentelemetry: 'OpenTelemetry',
 		symfony: 'Symfony',
 		laravel: 'Laravel',
+		django: 'Django',
 		flutter: 'Flutter',
 		android: 'Android',
 	};
 	return labels[framework] || framework;
 }
 
-export function getCodeLanguage(framework: Framework): 'go' | 'javascript' | 'bash' | 'php' {
+export function getCodeLanguage(framework: Framework): 'go' | 'javascript' | 'bash' | 'php' | 'python' {
 	if (framework === 'symfony') return 'php';
 	if (framework === 'laravel') return 'php';
+	if (framework === 'django') return 'python';
 	if (framework === 'opentelemetry') return 'go';
 	if (framework === 'hono') return 'javascript';
 	if (framework === 'cloudflare') return 'javascript';

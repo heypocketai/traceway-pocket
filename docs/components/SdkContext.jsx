@@ -22,6 +22,7 @@ export const SDK_OPTIONS = [
   { value: 'js-nextjs', label: 'Next.js (OTel)' },
   { value: 'php-symfony', label: 'Symfony' },
   { value: 'php-laravel', label: 'Laravel' },
+  { value: 'python-django', label: 'Django' },
   { value: 'flutter', label: 'Flutter' },
   { value: 'android', label: 'Android' },
   { value: 'react-native', label: 'React Native' },
@@ -53,6 +54,7 @@ const PATH_SDK_MAP = {
   'nextjs': 'js-nextjs',
   'symfony': 'php-symfony',
   'laravel': 'php-laravel',
+  'django': 'python-django',
   'flutter': 'flutter',
   'android': 'android',
 }
