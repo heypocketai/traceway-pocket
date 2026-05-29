@@ -29,6 +29,8 @@ const COLUMNS: Column[] = [
   {
     heading: "Resources",
     links: [
+      { label: "Blog", href: "/blog/engineering" },
+      { label: "Release Notes", href: "/blog" },
       { label: "Docs", href: "https://docs.tracewayapp.com", external: true },
       { label: "GitHub", href: "https://github.com/tracewayapp/traceway", external: true },
       {

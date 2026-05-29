@@ -4,11 +4,15 @@ import matter from "gray-matter";
 
 const BLOG_DIR = path.join(process.cwd(), "content", "blog");
 
+export type BlogCategory = "release" | "engineering";
+
 export type BlogPostMeta = {
   slug: string;
   title: string;
   date: string;
   version?: string;
+  category: BlogCategory;
+  description?: string;
 };
 
 export type BlogPost = BlogPostMeta & {
@@ -23,7 +27,11 @@ function readPostFile(filename: string): BlogPost | null {
   const title = typeof data.title === "string" ? data.title : slug;
   const date = typeof data.date === "string" ? data.date : "";
   const version = typeof data.version === "string" ? data.version : undefined;
-  return { slug, title, date, version, content };
+  const category: BlogCategory =
+    data.category === "engineering" ? "engineering" : "release";
+  const description =
+    typeof data.description === "string" ? data.description : undefined;
+  return { slug, title, date, version, category, description, content };
 }
 
 export function getAllPosts(): BlogPostMeta[] {
@@ -34,6 +42,10 @@ export function getAllPosts(): BlogPostMeta[] {
     .filter((p): p is BlogPost => p !== null)
     .sort((a, b) => (a.date < b.date ? 1 : -1))
     .map(({ content: _content, ...meta }) => meta);
+}
+
+export function getPostsByCategory(category: BlogCategory): BlogPostMeta[] {
+  return getAllPosts().filter((p) => p.category === category);
 }
 
 export function getPostBySlug(slug: string): BlogPost | null {

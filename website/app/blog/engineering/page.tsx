@@ -2,29 +2,32 @@ import type { Metadata } from "next";
 import { Eyebrow } from "@/components/eyebrow";
 import { BlogTabs } from "@/components/blog-tabs";
 import { BlogPostList } from "@/components/blog-post-list";
+import { BlogSubscribe } from "@/components/blog-subscribe";
 import { getPostsByCategory } from "@/lib/blog";
 
 export const metadata: Metadata = {
-  title: "Blog — Traceway",
-  description: "Release notes and updates from the Traceway team.",
+  title: "Engineering Blog — Traceway",
+  description: "Deep dives, benchmarks, and engineering notes from the Traceway team.",
 };
 
-export default function BlogIndex() {
-  const posts = getPostsByCategory("release");
+export default function EngineeringBlogIndex() {
+  const posts = getPostsByCategory("engineering");
 
   return (
     <main className="relative">
       <section className="wrap py-20">
         <div className="prose">
           <Eyebrow>Blog</Eyebrow>
-          <h1 className="mt-4 mb-3">Releases & updates</h1>
+          <h1 className="mt-4 mb-3">Engineering</h1>
           <p style={{ color: "var(--fg-3)" }} className="mb-12">
-            What we shipped, and when.
+            Deep dives, benchmarks, and how we build Traceway.
           </p>
 
-          <BlogTabs active="release" />
+          <BlogTabs active="engineering" />
 
           <BlogPostList posts={posts} />
+
+          <BlogSubscribe />
         </div>
       </section>
     </main>
