@@ -1,9 +1,12 @@
 #!/bin/bash
 set -e
 
-set -a
-source /app/.env
-set +a
+while IFS='=' read -r key value; do
+    [[ -z "$key" || "$key" == \#* ]] && continue
+    if [[ -z "${!key+x}" ]]; then
+        export "$key=$value"
+    fi
+done < /app/.env
 
 if [[ "$CLICKHOUSE_SERVER" == localhost* ]] || [[ "$CLICKHOUSE_SERVER" == 127.0.0.1* ]]; then
     echo "Waiting for ClickHouse to be ready..."

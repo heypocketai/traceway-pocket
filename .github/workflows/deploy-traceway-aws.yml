@@ -1,0 +1,143 @@
+name: Deploy Traceway to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: traceway-aws-prod
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-2
+  AWS_ROLE_ARN: arn:aws:iam::205930608622:role/github-traceway-pocket-deploy
+  ECR_REPOSITORY: traceway-pocket
+  INSTANCE_ID: i-0de7b9672a9347660
+  TARGET_GROUP_ARN: arn:aws:elasticloadbalancing:us-east-2:205930608622:targetgroup/traceway-tg/3893ebbc49863254
+  APP_BASE_URL: https://traceway.heypocketai.com
+  S3_BUCKET: traceway-replays-prod-205930608622-us-east-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tags
+        id: image
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
+          echo "sha_tag=${IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=${IMAGE}:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.sha_tag }}
+            ${{ steps.image.outputs.latest_tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Restart Traceway host
+        id: restart
+        env:
+          IMAGE: ${{ steps.image.outputs.sha_tag }}
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          region = os.environ["AWS_REGION"]
+          image = os.environ["IMAGE"]
+          registry = os.environ["ECR_REGISTRY"]
+          app_base_url = os.environ["APP_BASE_URL"]
+          s3_bucket = os.environ["S3_BUCKET"]
+
+          commands = [
+              "set -euo pipefail",
+              f"REGION={region!r}",
+              f"IMAGE={image!r}",
+              "JWT_SECRET=$(aws ssm get-parameter --region \"$REGION\" --name /traceway/prod/jwt-secret --with-decryption --query Parameter.Value --output text)",
+              "SMTP_HOST=$(aws ssm get-parameter --region \"$REGION\" --name /traceway/prod/smtp-host --query Parameter.Value --output text)",
+              "SMTP_PORT=$(aws ssm get-parameter --region \"$REGION\" --name /traceway/prod/smtp-port --query Parameter.Value --output text)",
+              "SMTP_USERNAME=$(aws ssm get-parameter --region \"$REGION\" --name /traceway/prod/smtp-username --with-decryption --query Parameter.Value --output text)",
+              "SMTP_PASSWORD=$(aws ssm get-parameter --region \"$REGION\" --name /traceway/prod/smtp-password --with-decryption --query Parameter.Value --output text)",
+              "SMTP_FROM=$(aws ssm get-parameter --region \"$REGION\" --name /traceway/prod/smtp-from --query Parameter.Value --output text)",
+              f"APP_BASE_URL={app_base_url!r}",
+              f"S3_BUCKET={s3_bucket!r}",
+              "timeout 15 openssl s_client -starttls smtp -connect \"$SMTP_HOST:$SMTP_PORT\" -servername \"$SMTP_HOST\" </dev/null 2>/dev/null | grep -q 'Verify return code: 0'",
+              "PREVIOUS_IMAGE=$(sudo docker inspect -f '{{.Config.Image}}' traceway 2>/dev/null || true)",
+              "run_traceway() { sudo docker run -d --name traceway --restart unless-stopped -p 80:80 -v /srv/traceway/clickhouse:/var/lib/clickhouse -v /srv/traceway/postgres:/var/lib/postgresql/data -e APP_BASE_URL=\"$APP_BASE_URL\" -e JWT_SECRET=\"$JWT_SECRET\" -e STORAGE_TYPE=s3 -e S3_BUCKET=\"$S3_BUCKET\" -e S3_REGION=\"$REGION\" -e SESSION_RECORDING_UPLOAD_WORKERS=64 -e SESSION_RECORDING_UPLOAD_QUEUE_SIZE=8192 -e SMTP_ENABLED=true -e SMTP_HOST=\"$SMTP_HOST\" -e SMTP_PORT=\"$SMTP_PORT\" -e SMTP_USERNAME=\"$SMTP_USERNAME\" -e SMTP_PASSWORD=\"$SMTP_PASSWORD\" -e SMTP_FROM=\"$SMTP_FROM\" \"$1\"; }",
+              "rollback() { status=$?; if [ \"$status\" -ne 0 ] && [ -n \"$PREVIOUS_IMAGE\" ]; then echo \"Deploy failed; rolling back to $PREVIOUS_IMAGE\"; sudo docker rm -f traceway || true; run_traceway \"$PREVIOUS_IMAGE\" || true; sleep 35; curl -fsS http://localhost/health || true; fi; exit \"$status\"; }",
+              "trap rollback ERR",
+              f"aws ecr get-login-password --region \"$REGION\" | sudo docker login --username AWS --password-stdin {registry!r}",
+              "sudo docker pull \"$IMAGE\"",
+              "sudo chown -R 999:999 /srv/traceway/clickhouse",
+              "sudo docker rm -f traceway || true",
+              "run_traceway \"$IMAGE\"",
+              "sleep 35",
+              "sudo docker ps --filter name=traceway",
+              "curl -fsS http://localhost/health",
+              "curl -fsS \"$APP_BASE_URL/health\"",
+          ]
+
+          with open("commands.json", "w", encoding="utf-8") as f:
+              json.dump({"commands": commands}, f)
+          PY
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${INSTANCE_ID}" \
+            --document-name AWS-RunShellScript \
+            --timeout-seconds 900 \
+            --parameters file://commands.json \
+            --query 'Command.CommandId' \
+            --output text)
+          echo "command_id=${COMMAND_ID}" >> "$GITHUB_OUTPUT"
+
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${INSTANCE_ID}"
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${INSTANCE_ID}" \
+            --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
+            --output json
+
+      - name: Verify ALB target health
+        run: |
+          aws elbv2 wait target-in-service \
+            --target-group-arn "${TARGET_GROUP_ARN}" \
+            --targets "Id=${INSTANCE_ID}"
+
+          aws elbv2 describe-target-health \
+            --target-group-arn "${TARGET_GROUP_ARN}" \
+            --targets "Id=${INSTANCE_ID}"
+
+      - name: Verify public health
+        run: curl -fsS "${APP_BASE_URL}/health"

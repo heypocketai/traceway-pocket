@@ -1,6 +1,7 @@
 package services
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
 	"net/smtp"
@@ -132,7 +133,7 @@ The Traceway Team
 }
 
 func (e *emailService) sendMail(to []string, msg []byte) error {
-	addr := fmt.Sprintf("%s:%d", e.host, e.port)
+	addr := net.JoinHostPort(e.host, strconv.Itoa(e.port))
 	auth := smtp.PlainAuth("", e.username, e.password, e.host)
 
 	conn, err := net.DialTimeout("tcp", addr, 10*time.Second)
@@ -148,6 +149,12 @@ func (e *emailService) sendMail(to []string, msg []byte) error {
 	defer client.Close()
 
 	conn.SetDeadline(time.Now().Add(10 * time.Second))
+
+	if ok, _ := client.Extension("STARTTLS"); ok {
+		if err := client.StartTLS(&tls.Config{ServerName: e.host}); err != nil {
+			return fmt.Errorf("SMTP STARTTLS failed: %w", err)
+		}
+	}
 
 	if err := client.Auth(auth); err != nil {
 		return fmt.Errorf("SMTP auth failed: %w", err)
