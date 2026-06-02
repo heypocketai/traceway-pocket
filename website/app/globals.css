@@ -38,6 +38,7 @@
   /* Fonts (populated by next/font in layout.tsx) */
   --font-display: "JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace;
   --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+  --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
   /* Radius */
   --radius: 6px;
@@ -126,6 +127,7 @@
   --font-sans: var(--font-display);
   --font-display: var(--font-display);
   --font-mono: var(--font-mono);
+  --font-body: var(--font-body);
 
   --radius-sm: calc(var(--radius) - 2px);
   --radius-md: var(--radius);
@@ -422,7 +424,7 @@
 
   /* Article reading panel */
   .blog-article {
-    max-width: 860px;
+    max-width: 920px;
     margin: 0 auto;
   }
   .blog-panel {
@@ -1336,6 +1338,103 @@
     margin: 28px auto;
     border-radius: var(--radius-lg);
     border: 1px solid var(--hair);
+  }
+
+  /* Blog reading typography — proportional Inter body, mono chrome.
+     Scoped so the marketing pages keep their all-mono aesthetic. */
+  .blog-lead {
+    font-family: var(--font-body);
+    font-size: 19px;
+    line-height: 1.7;
+    letter-spacing: 0;
+    color: var(--fg-1);
+  }
+  .blog-body p,
+  .blog-body li {
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.8;
+    letter-spacing: 0;
+    color: var(--fg-1);
+  }
+  .blog-body p {
+    margin: 0 0 18px;
+  }
+  .blog-body li {
+    margin: 8px 0;
+  }
+  .blog-body strong {
+    color: var(--fg-0);
+    font-weight: 600;
+  }
+  .blog-body code {
+    font-family: var(--font-mono);
+  }
+
+  /* Highlight a key phrase — use sparingly (raw <mark> in MDX). */
+  .blog-body mark {
+    background: color-mix(in oklab, var(--a1) 24%, transparent);
+    color: var(--fg-0);
+    padding: 1px 6px;
+    border-radius: 4px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+
+  /* Callout / aside — a styled markdown blockquote (> in MDX). */
+  .blog-body blockquote {
+    margin: 24px 0;
+    padding: 16px 20px;
+    border-left: 3px solid var(--a1);
+    background: color-mix(in oklab, var(--a1) 9%, transparent);
+    border-radius: 0 var(--radius) var(--radius) 0;
+  }
+  .blog-body blockquote p {
+    margin: 0;
+    color: var(--fg-1);
+  }
+  .blog-body blockquote p + p {
+    margin-top: 10px;
+  }
+
+  /* Blog post title — smaller than the marketing hero H1. */
+  .blog-article .prose h1 {
+    font-size: 38px;
+  }
+
+  /* Author byline */
+  .blog-byline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 24px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--fg-2);
+  }
+  .blog-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .prose .blog-author-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--hair-2);
+    object-fit: cover;
+    margin: 0;
+    display: block;
+  }
+  .blog-byline-sep {
+    color: var(--fg-3);
+  }
+  .prose a.blog-author {
+    color: var(--fg-1);
+    text-decoration: none;
+  }
+  .prose a.blog-author:hover {
+    color: var(--fg-0);
   }
 
   /* Logo color control */

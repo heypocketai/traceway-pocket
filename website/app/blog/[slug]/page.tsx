@@ -5,6 +5,7 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import { ArrowLeft } from "lucide-react";
 import { Eyebrow } from "@/components/eyebrow";
+import { BlogByline } from "@/components/blog-byline";
 import { BlogSubscribe } from "@/components/blog-subscribe";
 import { getAllPosts, getPostBySlug } from "@/lib/blog";
 
@@ -48,7 +49,7 @@ export default async function BlogPostPage({
 
   return (
     <main className="relative">
-      <section className="wrap py-20">
+      <section className="wrap pt-6 pb-24">
         <div className="blog-article">
           <Link
             href={isEngineering ? "/blog/engineering" : "/blog"}
@@ -67,26 +68,18 @@ export default async function BlogPostPage({
             <div className="prose">
               <Eyebrow>{isEngineering ? "Engineering" : "Release"}</Eyebrow>
               <h1 className="mt-4 mb-3">{post.title}</h1>
-              <p
-                style={{ color: "var(--fg-3)", fontFamily: "var(--font-mono)" }}
-                className={`${post.description ? "mb-3" : "mb-12"} text-[13px]`}
-              >
-                {formatDate(post.date)}
-              </p>
+              <BlogByline date={formatDate(post.date)} />
 
               {post.description && (
-                <p
-                  className="mb-12 text-[17px] leading-relaxed"
-                  style={{ color: "var(--fg-2)" }}
-                >
-                  {post.description}
-                </p>
+                <p className="blog-lead mb-12">{post.description}</p>
               )}
 
-              <MDXRemote
-                source={post.content}
-                options={{ mdxOptions: { remarkPlugins: [remarkGfm] } }}
-              />
+              <div className="blog-body">
+                <MDXRemote
+                  source={post.content}
+                  options={{ mdxOptions: { remarkPlugins: [remarkGfm] } }}
+                />
+              </div>
             </div>
           </article>
 

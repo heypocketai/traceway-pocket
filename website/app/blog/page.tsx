@@ -14,11 +14,11 @@ export default function BlogIndex() {
 
   return (
     <main className="relative">
-      <section className="wrap py-20">
+      <section className="wrap pt-6 pb-24">
         <div className="prose">
           <Eyebrow>Blog</Eyebrow>
           <h1 className="mt-4 mb-3">Releases & updates</h1>
-          <p style={{ color: "var(--fg-3)" }} className="mb-12">
+          <p style={{ color: "var(--fg-2)" }} className="mb-12">
             What we shipped, and when.
           </p>
 

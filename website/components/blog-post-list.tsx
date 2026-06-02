@@ -29,7 +29,7 @@ export function BlogPostList({ posts }: { posts: BlogPostMeta[] }) {
             {post.description && (
               <p
                 className="mt-2 text-[14px] leading-relaxed line-clamp-2"
-                style={{ color: "var(--fg-3)" }}
+                style={{ color: "var(--fg-2)", fontFamily: "var(--font-body)" }}
               >
                 {post.description}
               </p>
