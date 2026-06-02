@@ -1,7 +1,9 @@
 name: Deploy Traceway to AWS
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -21,13 +23,17 @@ env:
   TARGET_GROUP_ARN: arn:aws:elasticloadbalancing:us-east-2:205930608622:targetgroup/traceway-tg/3893ebbc49863254
   APP_BASE_URL: https://traceway.heypocketai.com
   S3_BUCKET: traceway-replays-prod-205930608622-us-east-2
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -43,7 +49,7 @@ jobs:
         id: image
         run: |
           IMAGE="${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}"
-          echo "sha_tag=${IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${IMAGE}:${DEPLOY_SHA}" >> "$GITHUB_OUTPUT"
           echo "latest_tag=${IMAGE}:latest" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
