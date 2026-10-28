@@ -13,5 +13,9 @@
     "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.57.0",
     "@opentelemetry/sdk-metrics": "^1.30.0"
+  },
+  "overrides": {
+    "protobufjs": "7.6.5",
+    "proxy-addr": "2.0.8"
   }
 }
